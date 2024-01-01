@@ -32,6 +32,8 @@
 #include "inet/transportlayer/contract/udp/UdpSocket.h"
 #include "inet/transportlayer/udp/UdpHeader_m.h"
 
+#define GREEDY_UDP_PORT    269
+
 namespace inet {
 namespace aodv {
 
@@ -77,7 +79,6 @@ class INET_API Aodv : public RoutingProtocolBase, public NetfilterBase::HookBase
     //Greedy
     const char *interfaces = nullptr;
     simtime_t beaconInterval;
-    simtime_t maxJitter;
     simtime_t neighborValidityInterval;
     bool displayBubbles;
 
@@ -96,6 +97,9 @@ class INET_API Aodv : public RoutingProtocolBase, public NetfilterBase::HookBase
     cMessage *beaconTimer = nullptr;
     cMessage *purgeNeighborsTimer = nullptr;
     PositionTable neighborPositionTable;
+    const char *outputInterface = nullptr;
+    // packet size
+    int positionByteLength = -1;
 
 
 
@@ -156,6 +160,43 @@ class INET_API Aodv : public RoutingProtocolBase, public NetfilterBase::HookBase
     std::multimap<L3Address, Packet *> targetAddressToDelayedPackets; // queue for the datagrams we have no route for
 
     //greedy methods
+    // handling beacon timers
+    void scheduleBeaconTimer();
+    void processBeaconTimer();
+
+    // handling purge neighbors timers
+    void schedulePurgeNeighborsTimer();
+    void processPurgeNeighborsTimer();
+
+    void sendUdpPacket(Packet *packet);
+
+    // handling beacons
+    const Ptr<GreedyBeacon> createBeacon();
+    void sendBeacon(const Ptr<GreedyBeacon>& beacon);
+    void processBeacon(Packet *packet);
+
+
+    // position
+    Coord lookupPositionInGlobalRegistry(const L3Address& address) const;
+    void storePositionInGlobalRegistry(const L3Address& address, const Coord& position) const;
+    void storeSelfPositionInGlobalRegistry() const;
+    Coord computeIntersectionInsideLineSegments(Coord& begin1, Coord& end1, Coord& begin2, Coord& end2) const;
+    Coord getNeighborPosition(const L3Address& address) const;
+
+    // neighbor
+    simtime_t getNextNeighborExpiration();
+    void purgeNeighbors();
+
+    // routing
+    bool routeDatagram(Packet *datagram, GreedyOption *greedyOption);
+    L3Address findGreedyRoutingNextHop(const L3Address& destination, GreedyOption *greedyOption);
+    GreedyOption *createGreedyOption(L3Address destination);
+    int computeOptionLength(GreedyOption *option);
+    const GreedyOption *findGreedyOptionInNetworkDatagram(const Ptr<const NetworkHeaderBase> &networkHeader) const;
+    const GreedyOption *getGreedyOptionFromNetworkDatagram(const Ptr<const NetworkHeaderBase> &networkHeader) const;
+    void setGreedyOptionOnNetworkDatagram(Packet *packet, const Ptr<const NetworkHeaderBase> &networkHeader, GreedyOption *greedyOption);
+
+
 
   protected:
     void handleMessageWhenUp(cMessage *msg) override;
