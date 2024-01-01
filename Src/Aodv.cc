@@ -24,7 +24,7 @@
 #include "inet/transportlayer/common/L4PortTag_m.h"
 #include "inet/transportlayer/contract/udp/UdpControlInfo.h"
 
-// GPSR
+// Greedy
 #include <algorithm>
 #include "inet/common/INETUtils.h"
 #include "inet/common/lifecycle/ModuleOperations.h"
@@ -59,7 +59,7 @@ namespace inet
 
             if (stage == INITSTAGE_LOCAL)
             {
-                // gpsr
+                // greedy
                 interfaces = par("interfaces");
                 beaconInterval = par("beaconInterval");
                 maxJitter = par("maxJitter");
@@ -189,7 +189,7 @@ namespace inet
         void Aodv::processBeaconTimer()
         {
             EV_DEBUG << "Processing beacon timer" << endl;
-            const L3Address selfAddress = getSelfAddress();
+            const L3Address selfAddress = getSelfIPAddress();
             if (!selfAddress.isUnspecified())
             {
                 sendBeacon(createBeacon());
@@ -201,7 +201,7 @@ namespace inet
 
         void Aodv::storeSelfPositionInGlobalRegistry() const
         {
-            auto selfAddress = getSelfAddress();
+            auto selfAddress = getSelfIPAddress();
             if (!selfAddress.isUnspecified())
                 storePositionInGlobalRegistry(selfAddress, mobility->getCurrentPosition());
         }
@@ -244,12 +244,12 @@ namespace inet
         // handling beacons
         //
 
-        const Ptr<GpsrBeacon> Gpsr::createBeacon()
+        const Ptr<GreedyBeacon> Aodv::createBeacon()
         {
-            const auto &beacon = makeShared<GpsrBeacon>();
-            beacon->setAddress(getSelfAddress());
+            const auto &beacon = makeShared<GreedyBeacon>();
+            beacon->setAddress(getSelfIPAddress());
             beacon->setPosition(mobility->getCurrentPosition());
-            beacon->setChunkLength(B(getSelfAddress().getAddressType()->getAddressByteLength() + positionByteLength));
+            beacon->setChunkLength(B(getSelfIPAddress().getAddressType()->getAddressByteLength() + positionByteLength));
             return beacon;
         }
 
@@ -258,18 +258,18 @@ namespace inet
             send(packet, "socketOut");
         }
 
-        void Aodv::sendBeacon(const Ptr<GpsrBeacon> &beacon)
+        void Aodv::sendBeacon(const Ptr<GreedyBeacon> &beacon)
         {
             EV_INFO << "Sending beacon: address = " << beacon->getAddress() << ", position = " << beacon->getPosition() << endl;
-            Packet *udpPacket = new Packet("GPSRBeacon");
+            Packet *udpPacket = new Packet("GreedyBeacon");
             udpPacket->insertAtBack(beacon);
             auto udpHeader = makeShared<UdpHeader>();
-            udpHeader->setSourcePort(GPSR_UDP_PORT); // what is this
-            udpHeader->setDestinationPort(GPSR_UDP_PORT);
+            udpHeader->setSourcePort(GREEDY_UDP_PORT); // what is this
+            udpHeader->setDestinationPort(GREEDY_UDP_PORT);
             udpHeader->setCrcMode(CRC_DISABLED);
             udpPacket->insertAtFront(udpHeader);
             auto addresses = udpPacket->addTag<L3AddressReq>();
-            addresses->setSrcAddress(getSelfAddress());
+            addresses->setSrcAddress(getSelfIPAddress());
             addresses->setDestAddress(addressType->getLinkLocalManetRoutersMulticastAddress());
             udpPacket->addTag<HopLimitReq>()->setHopLimit(255);
             udpPacket->addTag<PacketProtocolTag>()->setProtocol(&Protocol::manet);
@@ -279,12 +279,17 @@ namespace inet
 
         void Aodv::processBeacon(Packet *packet)
         {
-            const auto &beacon = packet->peekAtFront<GpsrBeacon>();
+            const auto &beacon = packet->peekAtFront<GreedyBeacon>();
             EV_INFO << "Processing beacon: address = " << beacon->getAddress() << ", position = " << beacon->getPosition() << endl;
             neighborPositionTable.setPosition(beacon->getAddress(), beacon->getPosition());
             delete packet;
         }
 
+        Coord Aodv::lookupPositionInGlobalRegistry(const L3Address &address) const
+        {
+            // KLUDGE implement position registry protocol
+            return globalPositionTable.getPosition(address);
+        }
         void Aodv::storePositionInGlobalRegistry(const L3Address &address, const Coord &position) const
         {
             // KLUDGE implement position registry protocol
@@ -305,6 +310,130 @@ namespace inet
                 return oldestPosition + neighborValidityInterval;
         }
 
+        GreedyOption *Aodv::createGreedyOption(L3Address destination)
+        {
+            GreedyOption *greedyOption = new GreedyOption();
+            greedyOption->setRoutingMode(GREEDY_ROUTING);
+            greedyOption->setDestinationPosition(lookupPositionInGlobalRegistry(destination));
+            greedyOption->setLength(computeOptionLength(greedyOption));
+            return greedyOption;
+        }
+
+        int Aodv::computeOptionLength(GreedyOption *option)
+        {
+            // routingMode
+            int routingModeBytes = 1;
+            // destinationPosition, perimeterRoutingStartPosition, perimeterRoutingForwardPosition
+            int positionsBytes = 3 * positionByteLength;
+            // type and length
+            int tlBytes = 1 + 1;
+
+            return tlBytes + routingModeBytes + positionsBytes;
+        }
+
+        const GreedyOption *Aodv::findGreedyOptionInNetworkDatagram(const Ptr<const NetworkHeaderBase> &networkHeader) const
+        {
+            const GreedyOption *greedyOption = nullptr;
+
+            #ifdef INET_WITH_IPv4
+            if (auto ipv4Header = dynamicPtrCast<const Ipv4Header>(networkHeader))
+            {
+                greedyOption = check_and_cast_nullable<const GreedyOption *>(ipv4Header->findOptionByType(IPOPTION_TLV_GPSR));
+            }
+            else
+            #endif
+            #ifdef INET_WITH_IPv6
+                if (auto ipv6Header = dynamicPtrCast<const Ipv6Header>(networkHeader))
+            {
+                const Ipv6HopByHopOptionsHeader *hdr = check_and_cast_nullable<const Ipv6HopByHopOptionsHeader *>(ipv6Header->findExtensionHeaderByType(IP_PROT_IPv6EXT_HOP));
+                if (hdr != nullptr)
+                {
+                    int i = (hdr->getTlvOptions().findByType(IPv6TLVOPTION_TLV_GPSR));
+                    if (i >= 0)
+                        greedyOption = check_and_cast<const GreedyOption *>(hdr->getTlvOptions().getTlvOption(i));
+                }
+            }
+            else
+            #endif
+            #ifdef INET_WITH_NEXTHOP
+                if (auto nextHopHeader = dynamicPtrCast<const NextHopForwardingHeader>(networkHeader))
+            {
+                int i = (nextHopHeader->getTlvOptions().findByType(NEXTHOP_TLVOPTION_TLV_GPSR));
+                if (i >= 0)
+                    greedyOption = check_and_cast<const GreedyOption *>(nextHopHeader->getTlvOptions().getTlvOption(i));
+            }
+            else
+            #endif
+            {
+            }
+            return greedyOption;
+        }
+
+        const GreedyOption *Aodv::getGreedyOptionFromNetworkDatagram(const Ptr<const NetworkHeaderBase> &networkHeader) const
+        {
+            const GreedyOption *greedyOption = findGreedyOptionInNetworkDatagram(networkHeader);
+            if (greedyOption == nullptr)
+                throw cRuntimeError("Greedy option not found in datagram!");
+            return greedyOption;
+        }
+
+        void Aodv::setGreedyOptionOnNetworkDatagram(Packet *packet, const Ptr<const NetworkHeaderBase> &networkHeader, GreedyOption *greedyOption)
+        {
+            packet->trimFront();
+            #ifdef INET_WITH_IPv4
+            if (dynamicPtrCast<const Ipv4Header>(networkHeader))
+            {
+                auto ipv4Header = removeNetworkProtocolHeader<Ipv4Header>(packet);
+                greedyOption->setType(IPOPTION_TLV_GPSR);
+                B oldHlen = ipv4Header->calculateHeaderByteLength();
+                ASSERT(ipv4Header->getHeaderLength() == oldHlen);
+                ipv4Header->addOption(greedyOption);
+                B newHlen = ipv4Header->calculateHeaderByteLength();
+                ipv4Header->setHeaderLength(newHlen);
+                ipv4Header->addChunkLength(newHlen - oldHlen);
+                ipv4Header->setTotalLengthField(ipv4Header->getTotalLengthField() + newHlen - oldHlen);
+                insertNetworkProtocolHeader(packet, Protocol::ipv4, ipv4Header);
+            }
+            else
+            #endif
+            #ifdef INET_WITH_IPv6
+                if (dynamicPtrCast<const Ipv6Header>(networkHeader))
+            {
+                auto ipv6Header = removeNetworkProtocolHeader<Ipv6Header>(packet);
+                greedyOption->setType(IPv6TLVOPTION_TLV_GPSR);
+                B oldHlen = ipv6Header->calculateHeaderByteLength();
+                Ipv6HopByHopOptionsHeader *hdr = check_and_cast_nullable<Ipv6HopByHopOptionsHeader *>(ipv6Header->findExtensionHeaderByTypeForUpdate(IP_PROT_IPv6EXT_HOP));
+                if (hdr == nullptr)
+                {
+                    hdr = new Ipv6HopByHopOptionsHeader();
+                    hdr->setByteLength(B(8));
+                    ipv6Header->addExtensionHeader(hdr);
+                }
+                hdr->getTlvOptionsForUpdate().appendTlvOption(greedyOption);
+                hdr->setByteLength(B(utils::roundUp(2 + B(hdr->getTlvOptions().getLength()).get(), 8)));
+                B newHlen = ipv6Header->calculateHeaderByteLength();
+                ipv6Header->addChunkLength(newHlen - oldHlen);
+                insertNetworkProtocolHeader(packet, Protocol::ipv6, ipv6Header);
+            }
+            else
+            #endif
+            #ifdef INET_WITH_NEXTHOP
+                if (dynamicPtrCast<const NextHopForwardingHeader>(networkHeader))
+            {
+                auto nextHopHeader = removeNetworkProtocolHeader<NextHopForwardingHeader>(packet);
+                greedyOption->setType(NEXTHOP_TLVOPTION_TLV_GPSR);
+                int oldHlen = nextHopHeader->getTlvOptions().getLength();
+                nextHopHeader->getTlvOptionsForUpdate().appendTlvOption(greedyOption);
+                int newHlen = nextHopHeader->getTlvOptions().getLength();
+                nextHopHeader->addChunkLength(B(newHlen - oldHlen));
+                insertNetworkProtocolHeader(packet, Protocol::nextHopForwarding, nextHopHeader);
+            }
+            else
+            #endif
+            {
+            }
+        }
+
         //=================================================================================
 
         void Aodv::checkIpVersionAndPacketTypeCompatibility(AodvControlPacketType packetType)
@@ -314,8 +443,6 @@ namespace inet
             case RREQ:
             case RREP:
             case RERR:
-            case RREQ_greedy:
-            case RREQ_Aodv:
             case RREPACK:
                 if (usingIpv6)
                     throw cRuntimeError("AODV Control Packet arrived with non-IPv6 packet type %d, but AODV configured for IPv6 routing", packetType);
@@ -336,55 +463,58 @@ namespace inet
 
         void Aodv::processPacket(Packet *packet)
         {
-            if (mode == greedy) // to implement
-                processBeacon(packet);
-            schedulePurgeNeighborsTimer();
-
-            L3Address sourceAddr = packet->getTag<L3AddressInd>()->getSrcAddress();
-            // KLUDGE I added this -1 after TTL decrement has been moved in Ipv4
-            unsigned int arrivalPacketTTL = packet->getTag<HopLimitInd>()->getHopLimit() - 1;
-            const auto &aodvPacket = packet->popAtFront<AodvControlPacket>();
-            // TODO aodvPacket->copyTags(*udpPacket);
-
-            auto packetType = aodvPacket->getPacketType();
-            switch (packetType)
+            const auto &beacon = packet->peekAtFront<GreedyBeacon>();
+            if (beacon != nullptr) // to implement
             {
-            case RREQ:
-            case RREQ_greedy:
-            case RREQ_Aodv:
-            case RREQ_IPv6:
-                checkIpVersionAndPacketTypeCompatibility(packetType);
-                handleRREQ(CHK(dynamicPtrCast<Rreq>(aodvPacket->dupShared())), sourceAddr, arrivalPacketTTL);
-                delete packet;
-                return;
+                processBeacon(packet);
+                schedulePurgeNeighborsTimer();
+            }
+            else
+            {
+                L3Address sourceAddr = packet->getTag<L3AddressInd>()->getSrcAddress();
+                // KLUDGE I added this -1 after TTL decrement has been moved in Ipv4
+                unsigned int arrivalPacketTTL = packet->getTag<HopLimitInd>()->getHopLimit() - 1;
+                const auto &aodvPacket = packet->popAtFront<AodvControlPacket>();
+                // TODO aodvPacket->copyTags(*udpPacket);
 
-            case RREP:
-            case RREP_IPv6:
-                checkIpVersionAndPacketTypeCompatibility(packetType);
-                handleRREP(CHK(dynamicPtrCast<Rrep>(aodvPacket->dupShared())), sourceAddr);
-                delete packet;
-                return;
+                auto packetType = aodvPacket->getPacketType();
+                switch (packetType)
+                {
+                case RREQ:
+                case RREQ_IPv6:
+                    checkIpVersionAndPacketTypeCompatibility(packetType);
+                    handleRREQ(CHK(dynamicPtrCast<Rreq>(aodvPacket->dupShared())), sourceAddr, arrivalPacketTTL);
+                    delete packet;
+                    return;
 
-            case RERR:
-            case RERR_IPv6:
-                checkIpVersionAndPacketTypeCompatibility(packetType);
-                handleRERR(CHK(dynamicPtrCast<const Rerr>(aodvPacket)), sourceAddr);
-                delete packet;
-                return;
+                case RREP:
+                case RREP_IPv6:
+                    checkIpVersionAndPacketTypeCompatibility(packetType);
+                    handleRREP(CHK(dynamicPtrCast<Rrep>(aodvPacket->dupShared())), sourceAddr);
+                    delete packet;
+                    return;
 
-            case RREPACK:
-            case RREPACK_IPv6:
-                checkIpVersionAndPacketTypeCompatibility(packetType);
-                handleRREPACK(CHK(dynamicPtrCast<const RrepAck>(aodvPacket)), sourceAddr);
-                delete packet;
-                return;
+                case RERR:
+                case RERR_IPv6:
+                    checkIpVersionAndPacketTypeCompatibility(packetType);
+                    handleRERR(CHK(dynamicPtrCast<const Rerr>(aodvPacket)), sourceAddr);
+                    delete packet;
+                    return;
 
-            default:
-                throw cRuntimeError("AODV Control Packet arrived with undefined packet type: %d", packetType);
+                case RREPACK:
+                case RREPACK_IPv6:
+                    checkIpVersionAndPacketTypeCompatibility(packetType);
+                    handleRREPACK(CHK(dynamicPtrCast<const RrepAck>(aodvPacket)), sourceAddr);
+                    delete packet;
+                    return;
+
+                default:
+                    throw cRuntimeError("AODV Control Packet arrived with undefined packet type: %d", packetType);
+                }
             }
         }
 
-        INetfilter::IHook::Result Aodv::ensureRouteForDatagram(Packet *datagram, bool iCreateGrOption)
+        INetfilter::IHook::Result Aodv::ensureRouteForDatagram(Packet *datagram)
         {
             const auto &networkHeader = getNetworkProtocolHeader(datagram);
             const L3Address &destAddr = networkHeader->getDestinationAddress();
@@ -1786,13 +1916,13 @@ namespace inet
             }
         }
 
-        bool Aodv::routeDatagram(Packet *datagram, GpsrOption *gpsrOption)
+        bool Aodv::routeDatagram(Packet *datagram, GreedyOption *greedyOption)
         {
             const auto &networkHeader = getNetworkProtocolHeader(datagram);
             const L3Address &source = networkHeader->getSourceAddress();
             const L3Address &destination = networkHeader->getDestinationAddress();
             EV_INFO << "Finding next hop: source = " << source << ", destination = " << destination << endl;
-            auto nextHop = findGreedyRoutingNextHop(destination, gpsrOption);
+            auto nextHop = findGreedyRoutingNextHop(destination, greedyOption);
             if (nextHop.isUnspecified())
             {
                 EV_WARN << "No next hop found, switching to AODV = " << source << ", destination = " << destination << endl;
@@ -1805,19 +1935,18 @@ namespace inet
                 EV_INFO << "Next hop found: source = " << source << ", destination = " << destination << ", nextHop: " << nextHop << endl;
                 
                 datagram->addTagIfAbsent<NextHopAddressReq>()->setNextHopAddress(nextHop);
-                gpsrOption->setSenderAddress(getSelfAddress());
                 auto networkInterface = CHK(interfaceTable->findInterfaceByName(outputInterface));
                 datagram->addTagIfAbsent<InterfaceReq>()->setInterfaceId(networkInterface->getInterfaceId());
                 return true;
             }
         }
 
-        L3Address Gpsr::findGreedyRoutingNextHop(const L3Address &destination, GpsrOption *gpsrOption)
+        L3Address Aodv::findGreedyRoutingNextHop(const L3Address &destination, GreedyOption *greedyOption)
         {
             EV_DEBUG << "Finding next hop using greedy routing: destination = " << destination << endl;
-            L3Address selfAddress = getSelfAddress();
+            L3Address selfAddress = getSelfIPAddress();
             Coord selfPosition = mobility->getCurrentPosition();
-            Coord destinationPosition = gpsrOption->getDestinationPosition();
+            Coord destinationPosition = greedyOption->getDestinationPosition();
             double bestDistance = (destinationPosition - selfPosition).length();
             L3Address bestNeighbor;
             std::vector<L3Address> neighborAddresses = neighborPositionTable.getAddresses();
@@ -1880,12 +2009,14 @@ namespace inet
                 else
                 {
                     // Check if route possible with Greedy routing
-                    if (mode == greedy)
+                    auto greedyOption = const_cast<GreedyOption *>(getGreedyOptionFromNetworkDatagram(networkHeader));
+                    auto mode = greedyOption->getRoutingMode();
+                    if (mode == GREEDY_ROUTING)
                     {
-                        auto gpsrOption = const_cast<GpsrOption *>(getGpsrOptionFromNetworkDatagram(networkHeader));
-                        if (routeDatagram(datagram, gpsrOption))
+                        if (routeDatagram(datagram, greedyOption))
                             return ACCEPT;
-                        else swtichmode(Aodv);
+                        else
+                            greedyOption->setRoutingMode(AODV_ROUTING);
                     }
 
                     bool isInactive = routeData && !routeData->isActive();
@@ -1954,12 +2085,12 @@ namespace inet
                 else
                 {
 
-                    GpsrOption *gpsrOption = createGpsrOption(networkHeader->getDestinationAddress());
-                    setGpsrOptionOnNetworkDatagram(packet, networkHeader, gpsrOption);
-                    if (routeDatagram(datagram, gpsrOption))
+                    GreedyOption *greedyOption = createGreedyOption(networkHeader->getDestinationAddress());
+                    setGreedyOptionOnNetworkDatagram(datagram, networkHeader, greedyOption);
+                    if (routeDatagram(datagram, greedyOption))
                         return ACCEPT;
                     else
-                        setmode(AODV)
+                        greedyOption->setRoutingMode(AODV_ROUTING);
 
 
                     bool isInactive = routeData && !routeData->isActive();
@@ -2015,7 +2146,9 @@ namespace inet
                 return ACCEPT;
             }
 
-            if(mode == AODV)
+            auto greedyOption = const_cast<GreedyOption *>(getGreedyOptionFromNetworkDatagram(networkHeader));
+            auto mode = greedyOption->getRoutingMode();
+            if(mode == GREEDY_ROUTING)
                 return ACCEPT;
 
             // TODO IMPLEMENT: check if the datagram is a data packet or we take control packets as data packets

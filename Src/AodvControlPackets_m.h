@@ -31,6 +31,8 @@
 namespace inet {
 namespace aodv {
 
+class GreedyBeacon;
+class GreedyOption;
 class AodvControlPacket;
 class Rreq;
 class Rrep;
@@ -47,6 +49,8 @@ class PacketHolderMessage;
 
 #include "inet/common/packet/chunk/Chunk_m.h" // import inet.common.packet.chunk.Chunk
 
+#include "inet/common/TlvOptions_m.h" // import inet.common.TlvOptions
+
 #include "inet/common/packet/Packet_m.h" // import inet.common.packet.Packet
 
 #include "inet/networklayer/common/L3Address_m.h" // import inet.networklayer.common.L3Address
@@ -58,7 +62,25 @@ namespace inet {
 namespace aodv {
 
 /**
- * Enum generated from <tt>inet/routing/aodv/AodvControlPackets.msg:15</tt> by opp_msgtool.
+ * Enum generated from <tt>inet/routing/aodv/AodvControlPackets.msg:16</tt> by opp_msgtool.
+ * <pre>
+ * enum ForwardingMode
+ * {
+ *     GREEDY_ROUTING = 1;
+ *     AODV_ROUTING = 2;
+ * }
+ * </pre>
+ */
+enum ForwardingMode {
+    GREEDY_ROUTING = 1,
+    AODV_ROUTING = 2
+};
+
+inline void doParsimPacking(omnetpp::cCommBuffer *b, const ForwardingMode& e) { b->pack(static_cast<int>(e)); }
+inline void doParsimUnpacking(omnetpp::cCommBuffer *b, ForwardingMode& e) { int n; b->unpack(n); e = static_cast<ForwardingMode>(n); }
+
+/**
+ * Enum generated from <tt>inet/routing/aodv/AodvControlPackets.msg:23</tt> by opp_msgtool.
  * <pre>
  * enum AodvControlPacketType
  * {
@@ -81,16 +103,99 @@ enum AodvControlPacketType {
     RREQ_IPv6 = 16,
     RREP_IPv6 = 17,
     RERR_IPv6 = 18,
-    RREPACK_IPv6 = 19,
-    RREQ_greedy = 21,
-    RREQ_Aodv =22
+    RREPACK_IPv6 = 19
 };
 
 inline void doParsimPacking(omnetpp::cCommBuffer *b, const AodvControlPacketType& e) { b->pack(static_cast<int>(e)); }
 inline void doParsimUnpacking(omnetpp::cCommBuffer *b, AodvControlPacketType& e) { int n; b->unpack(n); e = static_cast<AodvControlPacketType>(n); }
 
 /**
- * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:30</tt> by opp_msgtool.
+ * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:35</tt> by opp_msgtool.
+ * <pre>
+ * class GreedyBeacon extends FieldsChunk
+ * {
+ *     L3Address address;
+ *     Coord position;
+ * }
+ * </pre>
+ */
+class INET_API GreedyBeacon : public ::inet::FieldsChunk
+{
+  protected:
+    ::inet::L3Address address;
+    ::inet::Coord position;
+
+  private:
+    void copy(const GreedyBeacon& other);
+
+  protected:
+    bool operator==(const GreedyBeacon&) = delete;
+
+  public:
+    GreedyBeacon();
+    GreedyBeacon(const GreedyBeacon& other);
+    virtual ~GreedyBeacon();
+    GreedyBeacon& operator=(const GreedyBeacon& other);
+    virtual GreedyBeacon *dup() const override {return new GreedyBeacon(*this);}
+    virtual void parsimPack(omnetpp::cCommBuffer *b) const override;
+    virtual void parsimUnpack(omnetpp::cCommBuffer *b) override;
+
+    virtual const ::inet::L3Address& getAddress() const;
+    virtual ::inet::L3Address& getAddressForUpdate() { handleChange();return const_cast<::inet::L3Address&>(const_cast<GreedyBeacon*>(this)->getAddress());}
+    virtual void setAddress(const ::inet::L3Address& address);
+
+    virtual const ::inet::Coord& getPosition() const;
+    virtual ::inet::Coord& getPositionForUpdate() { handleChange();return const_cast<::inet::Coord&>(const_cast<GreedyBeacon*>(this)->getPosition());}
+    virtual void setPosition(const ::inet::Coord& position);
+};
+
+inline void doParsimPacking(omnetpp::cCommBuffer *b, const GreedyBeacon& obj) {obj.parsimPack(b);}
+inline void doParsimUnpacking(omnetpp::cCommBuffer *b, GreedyBeacon& obj) {obj.parsimUnpack(b);}
+
+/**
+ * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:40</tt> by opp_msgtool.
+ * <pre>
+ * class GreedyOption extends TlvOptionBase
+ * {
+ *     ForwardingMode routingMode;
+ *     Coord destinationPosition;               // D
+ * }
+ * </pre>
+ */
+class INET_API GreedyOption : public ::inet::TlvOptionBase
+{
+  protected:
+    ForwardingMode routingMode = static_cast<inet::aodv::ForwardingMode>(-1);
+    ::inet::Coord destinationPosition;
+
+  private:
+    void copy(const GreedyOption& other);
+
+  protected:
+    bool operator==(const GreedyOption&) = delete;
+
+  public:
+    GreedyOption();
+    GreedyOption(const GreedyOption& other);
+    virtual ~GreedyOption();
+    GreedyOption& operator=(const GreedyOption& other);
+    virtual GreedyOption *dup() const override {return new GreedyOption(*this);}
+    virtual void parsimPack(omnetpp::cCommBuffer *b) const override;
+    virtual void parsimUnpack(omnetpp::cCommBuffer *b) override;
+
+    virtual ForwardingMode getRoutingMode() const;
+    virtual void setRoutingMode(ForwardingMode routingMode);
+
+    virtual const ::inet::Coord& getDestinationPosition() const;
+    virtual ::inet::Coord& getDestinationPositionForUpdate() { return const_cast<::inet::Coord&>(const_cast<GreedyOption*>(this)->getDestinationPosition());}
+    virtual void setDestinationPosition(const ::inet::Coord& destinationPosition);
+};
+
+inline void doParsimPacking(omnetpp::cCommBuffer *b, const GreedyOption& obj) {obj.parsimPack(b);}
+inline void doParsimUnpacking(omnetpp::cCommBuffer *b, GreedyOption& obj) {obj.parsimUnpack(b);}
+
+/**
+ * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:49</tt> by opp_msgtool.
  * <pre>
  * //
  * // Base packet for AODV Control Packets
@@ -129,7 +234,7 @@ inline void doParsimPacking(omnetpp::cCommBuffer *b, const AodvControlPacket& ob
 inline void doParsimUnpacking(omnetpp::cCommBuffer *b, AodvControlPacket& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:38</tt> by opp_msgtool.
+ * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:57</tt> by opp_msgtool.
  * <pre>
  * //
  * // Represents an AODV Route Request
@@ -227,7 +332,7 @@ inline void doParsimPacking(omnetpp::cCommBuffer *b, const Rreq& obj) {obj.parsi
 inline void doParsimUnpacking(omnetpp::cCommBuffer *b, Rreq& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:59</tt> by opp_msgtool.
+ * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:78</tt> by opp_msgtool.
  * <pre>
  * //
  * // Represents an AODV Route Reply
@@ -310,7 +415,7 @@ inline void doParsimPacking(omnetpp::cCommBuffer *b, const Rrep& obj) {obj.parsi
 inline void doParsimUnpacking(omnetpp::cCommBuffer *b, Rrep& obj) {obj.parsimUnpack(b);}
 
 /**
- * Struct generated from inet/routing/aodv/AodvControlPackets.msg:77 by opp_msgtool.
+ * Struct generated from inet/routing/aodv/AodvControlPackets.msg:96 by opp_msgtool.
  */
 struct INET_API UnreachableNode
 {
@@ -327,7 +432,7 @@ inline void doParsimPacking(omnetpp::cCommBuffer *b, const UnreachableNode& obj)
 inline void doParsimUnpacking(omnetpp::cCommBuffer *b, UnreachableNode& obj) { __doUnpacking(b, obj); }
 
 /**
- * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:87</tt> by opp_msgtool.
+ * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:106</tt> by opp_msgtool.
  * <pre>
  * //
  * // Represents an AODV Route Error
@@ -386,7 +491,7 @@ inline void doParsimPacking(omnetpp::cCommBuffer *b, const Rerr& obj) {obj.parsi
 inline void doParsimUnpacking(omnetpp::cCommBuffer *b, Rerr& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:99</tt> by opp_msgtool.
+ * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:118</tt> by opp_msgtool.
  * <pre>
  * //
  * // Represents an AODV Route Reply ACK
@@ -427,7 +532,7 @@ inline void doParsimPacking(omnetpp::cCommBuffer *b, const RrepAck& obj) {obj.pa
 inline void doParsimUnpacking(omnetpp::cCommBuffer *b, RrepAck& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:109</tt> by opp_msgtool.
+ * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:128</tt> by opp_msgtool.
  * <pre>
  * //
  * // Represents an internal timer for a Route Reply packet in Aodv module
@@ -477,7 +582,7 @@ inline void doParsimPacking(omnetpp::cCommBuffer *b, const WaitForRrep& obj) {ob
 inline void doParsimUnpacking(omnetpp::cCommBuffer *b, WaitForRrep& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:119</tt> by opp_msgtool.
+ * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:138</tt> by opp_msgtool.
  * <pre>
  * //
  * // Represents a timer for delayed sending
@@ -519,59 +624,14 @@ inline void doParsimPacking(omnetpp::cCommBuffer *b, const PacketHolderMessage& 
 inline void doParsimUnpacking(omnetpp::cCommBuffer *b, PacketHolderMessage& obj) {obj.parsimUnpack(b);}
 
 
-/**
- * Class generated from <tt>inet/routing/gpsr/Gpsr.msg:35</tt> by opp_msgtool.
- * <pre>
- * //
- * // The GPSR beacon packet is sent periodically by all GPSR routers to notify
- * // the neighbors about the router's address and position.
- * //
- * class GpsrBeacon extends FieldsChunk
- * {
- *     L3Address address;
- *     Coord position;
- * }
- * </pre>
- */
-class INET_API GpsrBeacon : public ::inet::FieldsChunk
-{
-  protected:
-    L3Address address;
-    Coord position;
-
-  private:
-    void copy(const GpsrBeacon& other);
-
-  protected:
-    bool operator==(const GpsrBeacon&) = delete;
-
-  public:
-    GpsrBeacon();
-    GpsrBeacon(const GpsrBeacon& other);
-    virtual ~GpsrBeacon();
-    GpsrBeacon& operator=(const GpsrBeacon& other);
-    virtual GpsrBeacon *dup() const override {return new GpsrBeacon(*this);}
-    virtual void parsimPack(omnetpp::cCommBuffer *b) const override;
-    virtual void parsimUnpack(omnetpp::cCommBuffer *b) override;
-
-    virtual const L3Address& getAddress() const;
-    virtual L3Address& getAddressForUpdate() { handleChange();return const_cast<L3Address&>(const_cast<GpsrBeacon*>(this)->getAddress());}
-    virtual void setAddress(const L3Address& address);
-
-    virtual const Coord& getPosition() const;
-    virtual Coord& getPositionForUpdate() { handleChange();return const_cast<Coord&>(const_cast<GpsrBeacon*>(this)->getPosition());}
-    virtual void setPosition(const Coord& position);
-};
-
-inline void doParsimPacking(omnetpp::cCommBuffer *b, const GpsrBeacon& obj) {obj.parsimPack(b);}
-inline void doParsimUnpacking(omnetpp::cCommBuffer *b, GpsrBeacon& obj) {obj.parsimUnpack(b);}
-
 }  // namespace aodv
 }  // namespace inet
 
 
 namespace omnetpp {
 
+template<> inline inet::aodv::GreedyBeacon *fromAnyPtr(any_ptr ptr) { return check_and_cast<inet::aodv::GreedyBeacon*>(ptr.get<cObject>()); }
+template<> inline inet::aodv::GreedyOption *fromAnyPtr(any_ptr ptr) { return check_and_cast<inet::aodv::GreedyOption*>(ptr.get<cObject>()); }
 template<> inline inet::aodv::AodvControlPacket *fromAnyPtr(any_ptr ptr) { return check_and_cast<inet::aodv::AodvControlPacket*>(ptr.get<cObject>()); }
 template<> inline inet::aodv::Rreq *fromAnyPtr(any_ptr ptr) { return check_and_cast<inet::aodv::Rreq*>(ptr.get<cObject>()); }
 template<> inline inet::aodv::Rrep *fromAnyPtr(any_ptr ptr) { return check_and_cast<inet::aodv::Rrep*>(ptr.get<cObject>()); }

@@ -153,7 +153,765 @@ void doParsimUnpacking(omnetpp::cCommBuffer *, T& t)
 namespace inet {
 namespace aodv {
 
+Register_Enum(inet::aodv::ForwardingMode, (inet::aodv::ForwardingMode::GREEDY_ROUTING, inet::aodv::ForwardingMode::AODV_ROUTING));
+
 Register_Enum(inet::aodv::AodvControlPacketType, (inet::aodv::AodvControlPacketType::RREQ, inet::aodv::AodvControlPacketType::RREP, inet::aodv::AodvControlPacketType::RERR, inet::aodv::AodvControlPacketType::RREPACK, inet::aodv::AodvControlPacketType::RREQ_IPv6, inet::aodv::AodvControlPacketType::RREP_IPv6, inet::aodv::AodvControlPacketType::RERR_IPv6, inet::aodv::AodvControlPacketType::RREPACK_IPv6));
+
+Register_Class(GreedyBeacon)
+
+GreedyBeacon::GreedyBeacon() : ::inet::FieldsChunk()
+{
+}
+
+GreedyBeacon::GreedyBeacon(const GreedyBeacon& other) : ::inet::FieldsChunk(other)
+{
+    copy(other);
+}
+
+GreedyBeacon::~GreedyBeacon()
+{
+}
+
+GreedyBeacon& GreedyBeacon::operator=(const GreedyBeacon& other)
+{
+    if (this == &other) return *this;
+    ::inet::FieldsChunk::operator=(other);
+    copy(other);
+    return *this;
+}
+
+void GreedyBeacon::copy(const GreedyBeacon& other)
+{
+    this->address = other.address;
+    this->position = other.position;
+}
+
+void GreedyBeacon::parsimPack(omnetpp::cCommBuffer *b) const
+{
+    ::inet::FieldsChunk::parsimPack(b);
+    doParsimPacking(b,this->address);
+    doParsimPacking(b,this->position);
+}
+
+void GreedyBeacon::parsimUnpack(omnetpp::cCommBuffer *b)
+{
+    ::inet::FieldsChunk::parsimUnpack(b);
+    doParsimUnpacking(b,this->address);
+    doParsimUnpacking(b,this->position);
+}
+
+const ::inet::L3Address& GreedyBeacon::getAddress() const
+{
+    return this->address;
+}
+
+void GreedyBeacon::setAddress(const ::inet::L3Address& address)
+{
+    handleChange();
+    this->address = address;
+}
+
+const ::inet::Coord& GreedyBeacon::getPosition() const
+{
+    return this->position;
+}
+
+void GreedyBeacon::setPosition(const ::inet::Coord& position)
+{
+    handleChange();
+    this->position = position;
+}
+
+class GreedyBeaconDescriptor : public omnetpp::cClassDescriptor
+{
+  private:
+    mutable const char **propertyNames;
+    enum FieldConstants {
+        FIELD_address,
+        FIELD_position,
+    };
+  public:
+    GreedyBeaconDescriptor();
+    virtual ~GreedyBeaconDescriptor();
+
+    virtual bool doesSupport(omnetpp::cObject *obj) const override;
+    virtual const char **getPropertyNames() const override;
+    virtual const char *getProperty(const char *propertyName) const override;
+    virtual int getFieldCount() const override;
+    virtual const char *getFieldName(int field) const override;
+    virtual int findField(const char *fieldName) const override;
+    virtual unsigned int getFieldTypeFlags(int field) const override;
+    virtual const char *getFieldTypeString(int field) const override;
+    virtual const char **getFieldPropertyNames(int field) const override;
+    virtual const char *getFieldProperty(int field, const char *propertyName) const override;
+    virtual int getFieldArraySize(omnetpp::any_ptr object, int field) const override;
+    virtual void setFieldArraySize(omnetpp::any_ptr object, int field, int size) const override;
+
+    virtual const char *getFieldDynamicTypeString(omnetpp::any_ptr object, int field, int i) const override;
+    virtual std::string getFieldValueAsString(omnetpp::any_ptr object, int field, int i) const override;
+    virtual void setFieldValueAsString(omnetpp::any_ptr object, int field, int i, const char *value) const override;
+    virtual omnetpp::cValue getFieldValue(omnetpp::any_ptr object, int field, int i) const override;
+    virtual void setFieldValue(omnetpp::any_ptr object, int field, int i, const omnetpp::cValue& value) const override;
+
+    virtual const char *getFieldStructName(int field) const override;
+    virtual omnetpp::any_ptr getFieldStructValuePointer(omnetpp::any_ptr object, int field, int i) const override;
+    virtual void setFieldStructValuePointer(omnetpp::any_ptr object, int field, int i, omnetpp::any_ptr ptr) const override;
+};
+
+Register_ClassDescriptor(GreedyBeaconDescriptor)
+
+GreedyBeaconDescriptor::GreedyBeaconDescriptor() : omnetpp::cClassDescriptor(omnetpp::opp_typename(typeid(inet::aodv::GreedyBeacon)), "inet::FieldsChunk")
+{
+    propertyNames = nullptr;
+}
+
+GreedyBeaconDescriptor::~GreedyBeaconDescriptor()
+{
+    delete[] propertyNames;
+}
+
+bool GreedyBeaconDescriptor::doesSupport(omnetpp::cObject *obj) const
+{
+    return dynamic_cast<GreedyBeacon *>(obj)!=nullptr;
+}
+
+const char **GreedyBeaconDescriptor::getPropertyNames() const
+{
+    if (!propertyNames) {
+        static const char *names[] = {  nullptr };
+        omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+        const char **baseNames = base ? base->getPropertyNames() : nullptr;
+        propertyNames = mergeLists(baseNames, names);
+    }
+    return propertyNames;
+}
+
+const char *GreedyBeaconDescriptor::getProperty(const char *propertyName) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    return base ? base->getProperty(propertyName) : nullptr;
+}
+
+int GreedyBeaconDescriptor::getFieldCount() const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    return base ? 2+base->getFieldCount() : 2;
+}
+
+unsigned int GreedyBeaconDescriptor::getFieldTypeFlags(int field) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldTypeFlags(field);
+        field -= base->getFieldCount();
+    }
+    static unsigned int fieldTypeFlags[] = {
+        0,    // FIELD_address
+        FD_ISCOMPOUND,    // FIELD_position
+    };
+    return (field >= 0 && field < 2) ? fieldTypeFlags[field] : 0;
+}
+
+const char *GreedyBeaconDescriptor::getFieldName(int field) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldName(field);
+        field -= base->getFieldCount();
+    }
+    static const char *fieldNames[] = {
+        "address",
+        "position",
+    };
+    return (field >= 0 && field < 2) ? fieldNames[field] : nullptr;
+}
+
+int GreedyBeaconDescriptor::findField(const char *fieldName) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    int baseIndex = base ? base->getFieldCount() : 0;
+    if (strcmp(fieldName, "address") == 0) return baseIndex + 0;
+    if (strcmp(fieldName, "position") == 0) return baseIndex + 1;
+    return base ? base->findField(fieldName) : -1;
+}
+
+const char *GreedyBeaconDescriptor::getFieldTypeString(int field) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldTypeString(field);
+        field -= base->getFieldCount();
+    }
+    static const char *fieldTypeStrings[] = {
+        "inet::L3Address",    // FIELD_address
+        "inet::Coord",    // FIELD_position
+    };
+    return (field >= 0 && field < 2) ? fieldTypeStrings[field] : nullptr;
+}
+
+const char **GreedyBeaconDescriptor::getFieldPropertyNames(int field) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldPropertyNames(field);
+        field -= base->getFieldCount();
+    }
+    switch (field) {
+        default: return nullptr;
+    }
+}
+
+const char *GreedyBeaconDescriptor::getFieldProperty(int field, const char *propertyName) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldProperty(field, propertyName);
+        field -= base->getFieldCount();
+    }
+    switch (field) {
+        default: return nullptr;
+    }
+}
+
+int GreedyBeaconDescriptor::getFieldArraySize(omnetpp::any_ptr object, int field) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldArraySize(object, field);
+        field -= base->getFieldCount();
+    }
+    GreedyBeacon *pp = omnetpp::fromAnyPtr<GreedyBeacon>(object); (void)pp;
+    switch (field) {
+        default: return 0;
+    }
+}
+
+void GreedyBeaconDescriptor::setFieldArraySize(omnetpp::any_ptr object, int field, int size) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount()){
+            base->setFieldArraySize(object, field, size);
+            return;
+        }
+        field -= base->getFieldCount();
+    }
+    GreedyBeacon *pp = omnetpp::fromAnyPtr<GreedyBeacon>(object); (void)pp;
+    switch (field) {
+        default: throw omnetpp::cRuntimeError("Cannot set array size of field %d of class 'GreedyBeacon'", field);
+    }
+}
+
+const char *GreedyBeaconDescriptor::getFieldDynamicTypeString(omnetpp::any_ptr object, int field, int i) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldDynamicTypeString(object,field,i);
+        field -= base->getFieldCount();
+    }
+    GreedyBeacon *pp = omnetpp::fromAnyPtr<GreedyBeacon>(object); (void)pp;
+    switch (field) {
+        default: return nullptr;
+    }
+}
+
+std::string GreedyBeaconDescriptor::getFieldValueAsString(omnetpp::any_ptr object, int field, int i) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldValueAsString(object,field,i);
+        field -= base->getFieldCount();
+    }
+    GreedyBeacon *pp = omnetpp::fromAnyPtr<GreedyBeacon>(object); (void)pp;
+    switch (field) {
+        case FIELD_address: return pp->getAddress().str();
+        case FIELD_position: return pp->getPosition().str();
+        default: return "";
+    }
+}
+
+void GreedyBeaconDescriptor::setFieldValueAsString(omnetpp::any_ptr object, int field, int i, const char *value) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount()){
+            base->setFieldValueAsString(object, field, i, value);
+            return;
+        }
+        field -= base->getFieldCount();
+    }
+    GreedyBeacon *pp = omnetpp::fromAnyPtr<GreedyBeacon>(object); (void)pp;
+    switch (field) {
+        default: throw omnetpp::cRuntimeError("Cannot set field %d of class 'GreedyBeacon'", field);
+    }
+}
+
+omnetpp::cValue GreedyBeaconDescriptor::getFieldValue(omnetpp::any_ptr object, int field, int i) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldValue(object,field,i);
+        field -= base->getFieldCount();
+    }
+    GreedyBeacon *pp = omnetpp::fromAnyPtr<GreedyBeacon>(object); (void)pp;
+    switch (field) {
+        case FIELD_address: return omnetpp::toAnyPtr(&pp->getAddress()); break;
+        case FIELD_position: return omnetpp::toAnyPtr(&pp->getPosition()); break;
+        default: throw omnetpp::cRuntimeError("Cannot return field %d of class 'GreedyBeacon' as cValue -- field index out of range?", field);
+    }
+}
+
+void GreedyBeaconDescriptor::setFieldValue(omnetpp::any_ptr object, int field, int i, const omnetpp::cValue& value) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount()){
+            base->setFieldValue(object, field, i, value);
+            return;
+        }
+        field -= base->getFieldCount();
+    }
+    GreedyBeacon *pp = omnetpp::fromAnyPtr<GreedyBeacon>(object); (void)pp;
+    switch (field) {
+        default: throw omnetpp::cRuntimeError("Cannot set field %d of class 'GreedyBeacon'", field);
+    }
+}
+
+const char *GreedyBeaconDescriptor::getFieldStructName(int field) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldStructName(field);
+        field -= base->getFieldCount();
+    }
+    switch (field) {
+        case FIELD_position: return omnetpp::opp_typename(typeid(::inet::Coord));
+        default: return nullptr;
+    };
+}
+
+omnetpp::any_ptr GreedyBeaconDescriptor::getFieldStructValuePointer(omnetpp::any_ptr object, int field, int i) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldStructValuePointer(object, field, i);
+        field -= base->getFieldCount();
+    }
+    GreedyBeacon *pp = omnetpp::fromAnyPtr<GreedyBeacon>(object); (void)pp;
+    switch (field) {
+        case FIELD_address: return omnetpp::toAnyPtr(&pp->getAddress()); break;
+        case FIELD_position: return omnetpp::toAnyPtr(&pp->getPosition()); break;
+        default: return omnetpp::any_ptr(nullptr);
+    }
+}
+
+void GreedyBeaconDescriptor::setFieldStructValuePointer(omnetpp::any_ptr object, int field, int i, omnetpp::any_ptr ptr) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount()){
+            base->setFieldStructValuePointer(object, field, i, ptr);
+            return;
+        }
+        field -= base->getFieldCount();
+    }
+    GreedyBeacon *pp = omnetpp::fromAnyPtr<GreedyBeacon>(object); (void)pp;
+    switch (field) {
+        default: throw omnetpp::cRuntimeError("Cannot set field %d of class 'GreedyBeacon'", field);
+    }
+}
+
+Register_Class(GreedyOption)
+
+GreedyOption::GreedyOption() : ::inet::TlvOptionBase()
+{
+}
+
+GreedyOption::GreedyOption(const GreedyOption& other) : ::inet::TlvOptionBase(other)
+{
+    copy(other);
+}
+
+GreedyOption::~GreedyOption()
+{
+}
+
+GreedyOption& GreedyOption::operator=(const GreedyOption& other)
+{
+    if (this == &other) return *this;
+    ::inet::TlvOptionBase::operator=(other);
+    copy(other);
+    return *this;
+}
+
+void GreedyOption::copy(const GreedyOption& other)
+{
+    this->routingMode = other.routingMode;
+    this->destinationPosition = other.destinationPosition;
+}
+
+void GreedyOption::parsimPack(omnetpp::cCommBuffer *b) const
+{
+    ::inet::TlvOptionBase::parsimPack(b);
+    doParsimPacking(b,this->routingMode);
+    doParsimPacking(b,this->destinationPosition);
+}
+
+void GreedyOption::parsimUnpack(omnetpp::cCommBuffer *b)
+{
+    ::inet::TlvOptionBase::parsimUnpack(b);
+    doParsimUnpacking(b,this->routingMode);
+    doParsimUnpacking(b,this->destinationPosition);
+}
+
+ForwardingMode GreedyOption::getRoutingMode() const
+{
+    return this->routingMode;
+}
+
+void GreedyOption::setRoutingMode(ForwardingMode routingMode)
+{
+    this->routingMode = routingMode;
+}
+
+const ::inet::Coord& GreedyOption::getDestinationPosition() const
+{
+    return this->destinationPosition;
+}
+
+void GreedyOption::setDestinationPosition(const ::inet::Coord& destinationPosition)
+{
+    this->destinationPosition = destinationPosition;
+}
+
+class GreedyOptionDescriptor : public omnetpp::cClassDescriptor
+{
+  private:
+    mutable const char **propertyNames;
+    enum FieldConstants {
+        FIELD_routingMode,
+        FIELD_destinationPosition,
+    };
+  public:
+    GreedyOptionDescriptor();
+    virtual ~GreedyOptionDescriptor();
+
+    virtual bool doesSupport(omnetpp::cObject *obj) const override;
+    virtual const char **getPropertyNames() const override;
+    virtual const char *getProperty(const char *propertyName) const override;
+    virtual int getFieldCount() const override;
+    virtual const char *getFieldName(int field) const override;
+    virtual int findField(const char *fieldName) const override;
+    virtual unsigned int getFieldTypeFlags(int field) const override;
+    virtual const char *getFieldTypeString(int field) const override;
+    virtual const char **getFieldPropertyNames(int field) const override;
+    virtual const char *getFieldProperty(int field, const char *propertyName) const override;
+    virtual int getFieldArraySize(omnetpp::any_ptr object, int field) const override;
+    virtual void setFieldArraySize(omnetpp::any_ptr object, int field, int size) const override;
+
+    virtual const char *getFieldDynamicTypeString(omnetpp::any_ptr object, int field, int i) const override;
+    virtual std::string getFieldValueAsString(omnetpp::any_ptr object, int field, int i) const override;
+    virtual void setFieldValueAsString(omnetpp::any_ptr object, int field, int i, const char *value) const override;
+    virtual omnetpp::cValue getFieldValue(omnetpp::any_ptr object, int field, int i) const override;
+    virtual void setFieldValue(omnetpp::any_ptr object, int field, int i, const omnetpp::cValue& value) const override;
+
+    virtual const char *getFieldStructName(int field) const override;
+    virtual omnetpp::any_ptr getFieldStructValuePointer(omnetpp::any_ptr object, int field, int i) const override;
+    virtual void setFieldStructValuePointer(omnetpp::any_ptr object, int field, int i, omnetpp::any_ptr ptr) const override;
+};
+
+Register_ClassDescriptor(GreedyOptionDescriptor)
+
+GreedyOptionDescriptor::GreedyOptionDescriptor() : omnetpp::cClassDescriptor(omnetpp::opp_typename(typeid(inet::aodv::GreedyOption)), "inet::TlvOptionBase")
+{
+    propertyNames = nullptr;
+}
+
+GreedyOptionDescriptor::~GreedyOptionDescriptor()
+{
+    delete[] propertyNames;
+}
+
+bool GreedyOptionDescriptor::doesSupport(omnetpp::cObject *obj) const
+{
+    return dynamic_cast<GreedyOption *>(obj)!=nullptr;
+}
+
+const char **GreedyOptionDescriptor::getPropertyNames() const
+{
+    if (!propertyNames) {
+        static const char *names[] = {  nullptr };
+        omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+        const char **baseNames = base ? base->getPropertyNames() : nullptr;
+        propertyNames = mergeLists(baseNames, names);
+    }
+    return propertyNames;
+}
+
+const char *GreedyOptionDescriptor::getProperty(const char *propertyName) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    return base ? base->getProperty(propertyName) : nullptr;
+}
+
+int GreedyOptionDescriptor::getFieldCount() const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    return base ? 2+base->getFieldCount() : 2;
+}
+
+unsigned int GreedyOptionDescriptor::getFieldTypeFlags(int field) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldTypeFlags(field);
+        field -= base->getFieldCount();
+    }
+    static unsigned int fieldTypeFlags[] = {
+        FD_ISEDITABLE,    // FIELD_routingMode
+        FD_ISCOMPOUND,    // FIELD_destinationPosition
+    };
+    return (field >= 0 && field < 2) ? fieldTypeFlags[field] : 0;
+}
+
+const char *GreedyOptionDescriptor::getFieldName(int field) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldName(field);
+        field -= base->getFieldCount();
+    }
+    static const char *fieldNames[] = {
+        "routingMode",
+        "destinationPosition",
+    };
+    return (field >= 0 && field < 2) ? fieldNames[field] : nullptr;
+}
+
+int GreedyOptionDescriptor::findField(const char *fieldName) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    int baseIndex = base ? base->getFieldCount() : 0;
+    if (strcmp(fieldName, "routingMode") == 0) return baseIndex + 0;
+    if (strcmp(fieldName, "destinationPosition") == 0) return baseIndex + 1;
+    return base ? base->findField(fieldName) : -1;
+}
+
+const char *GreedyOptionDescriptor::getFieldTypeString(int field) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldTypeString(field);
+        field -= base->getFieldCount();
+    }
+    static const char *fieldTypeStrings[] = {
+        "inet::aodv::ForwardingMode",    // FIELD_routingMode
+        "inet::Coord",    // FIELD_destinationPosition
+    };
+    return (field >= 0 && field < 2) ? fieldTypeStrings[field] : nullptr;
+}
+
+const char **GreedyOptionDescriptor::getFieldPropertyNames(int field) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldPropertyNames(field);
+        field -= base->getFieldCount();
+    }
+    switch (field) {
+        case FIELD_routingMode: {
+            static const char *names[] = { "enum",  nullptr };
+            return names;
+        }
+        default: return nullptr;
+    }
+}
+
+const char *GreedyOptionDescriptor::getFieldProperty(int field, const char *propertyName) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldProperty(field, propertyName);
+        field -= base->getFieldCount();
+    }
+    switch (field) {
+        case FIELD_routingMode:
+            if (!strcmp(propertyName, "enum")) return "inet::aodv::ForwardingMode";
+            return nullptr;
+        default: return nullptr;
+    }
+}
+
+int GreedyOptionDescriptor::getFieldArraySize(omnetpp::any_ptr object, int field) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldArraySize(object, field);
+        field -= base->getFieldCount();
+    }
+    GreedyOption *pp = omnetpp::fromAnyPtr<GreedyOption>(object); (void)pp;
+    switch (field) {
+        default: return 0;
+    }
+}
+
+void GreedyOptionDescriptor::setFieldArraySize(omnetpp::any_ptr object, int field, int size) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount()){
+            base->setFieldArraySize(object, field, size);
+            return;
+        }
+        field -= base->getFieldCount();
+    }
+    GreedyOption *pp = omnetpp::fromAnyPtr<GreedyOption>(object); (void)pp;
+    switch (field) {
+        default: throw omnetpp::cRuntimeError("Cannot set array size of field %d of class 'GreedyOption'", field);
+    }
+}
+
+const char *GreedyOptionDescriptor::getFieldDynamicTypeString(omnetpp::any_ptr object, int field, int i) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldDynamicTypeString(object,field,i);
+        field -= base->getFieldCount();
+    }
+    GreedyOption *pp = omnetpp::fromAnyPtr<GreedyOption>(object); (void)pp;
+    switch (field) {
+        default: return nullptr;
+    }
+}
+
+std::string GreedyOptionDescriptor::getFieldValueAsString(omnetpp::any_ptr object, int field, int i) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldValueAsString(object,field,i);
+        field -= base->getFieldCount();
+    }
+    GreedyOption *pp = omnetpp::fromAnyPtr<GreedyOption>(object); (void)pp;
+    switch (field) {
+        case FIELD_routingMode: return enum2string(pp->getRoutingMode(), "inet::aodv::ForwardingMode");
+        case FIELD_destinationPosition: return pp->getDestinationPosition().str();
+        default: return "";
+    }
+}
+
+void GreedyOptionDescriptor::setFieldValueAsString(omnetpp::any_ptr object, int field, int i, const char *value) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount()){
+            base->setFieldValueAsString(object, field, i, value);
+            return;
+        }
+        field -= base->getFieldCount();
+    }
+    GreedyOption *pp = omnetpp::fromAnyPtr<GreedyOption>(object); (void)pp;
+    switch (field) {
+        case FIELD_routingMode: pp->setRoutingMode((inet::aodv::ForwardingMode)string2enum(value, "inet::aodv::ForwardingMode")); break;
+        default: throw omnetpp::cRuntimeError("Cannot set field %d of class 'GreedyOption'", field);
+    }
+}
+
+omnetpp::cValue GreedyOptionDescriptor::getFieldValue(omnetpp::any_ptr object, int field, int i) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldValue(object,field,i);
+        field -= base->getFieldCount();
+    }
+    GreedyOption *pp = omnetpp::fromAnyPtr<GreedyOption>(object); (void)pp;
+    switch (field) {
+        case FIELD_routingMode: return static_cast<int>(pp->getRoutingMode());
+        case FIELD_destinationPosition: return omnetpp::toAnyPtr(&pp->getDestinationPosition()); break;
+        default: throw omnetpp::cRuntimeError("Cannot return field %d of class 'GreedyOption' as cValue -- field index out of range?", field);
+    }
+}
+
+void GreedyOptionDescriptor::setFieldValue(omnetpp::any_ptr object, int field, int i, const omnetpp::cValue& value) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount()){
+            base->setFieldValue(object, field, i, value);
+            return;
+        }
+        field -= base->getFieldCount();
+    }
+    GreedyOption *pp = omnetpp::fromAnyPtr<GreedyOption>(object); (void)pp;
+    switch (field) {
+        case FIELD_routingMode: pp->setRoutingMode(static_cast<inet::aodv::ForwardingMode>(value.intValue())); break;
+        default: throw omnetpp::cRuntimeError("Cannot set field %d of class 'GreedyOption'", field);
+    }
+}
+
+const char *GreedyOptionDescriptor::getFieldStructName(int field) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldStructName(field);
+        field -= base->getFieldCount();
+    }
+    switch (field) {
+        case FIELD_destinationPosition: return omnetpp::opp_typename(typeid(::inet::Coord));
+        default: return nullptr;
+    };
+}
+
+omnetpp::any_ptr GreedyOptionDescriptor::getFieldStructValuePointer(omnetpp::any_ptr object, int field, int i) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount())
+            return base->getFieldStructValuePointer(object, field, i);
+        field -= base->getFieldCount();
+    }
+    GreedyOption *pp = omnetpp::fromAnyPtr<GreedyOption>(object); (void)pp;
+    switch (field) {
+        case FIELD_destinationPosition: return omnetpp::toAnyPtr(&pp->getDestinationPosition()); break;
+        default: return omnetpp::any_ptr(nullptr);
+    }
+}
+
+void GreedyOptionDescriptor::setFieldStructValuePointer(omnetpp::any_ptr object, int field, int i, omnetpp::any_ptr ptr) const
+{
+    omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
+    if (base) {
+        if (field < base->getFieldCount()){
+            base->setFieldStructValuePointer(object, field, i, ptr);
+            return;
+        }
+        field -= base->getFieldCount();
+    }
+    GreedyOption *pp = omnetpp::fromAnyPtr<GreedyOption>(object); (void)pp;
+    switch (field) {
+        default: throw omnetpp::cRuntimeError("Cannot set field %d of class 'GreedyOption'", field);
+    }
+}
 
 Register_Class(AodvControlPacket)
 
