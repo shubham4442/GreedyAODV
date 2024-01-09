@@ -29,13 +29,9 @@ enum AodvControlPacketType
     RREP_IPv6 = 17;
     RERR_IPv6 = 18;
     RREPACK_IPv6 = 19;
+    GREEDY_BEACON = 21;
 };
 
-class GreedyBeacon extends FieldsChunk
-{
-    L3Address address;
-    Coord position;
-}
 
 class GreedyOption extends TlvOptionBase {
     ForwardingMode routingMode;
@@ -48,6 +44,12 @@ class GreedyOption extends TlvOptionBase {
 class AodvControlPacket extends FieldsChunk
 {
     AodvControlPacketType packetType = static_cast<AodvControlPacketType>(-1);       // packet type, stored in one byte
+}
+
+class GreedyBeacon extends AodvControlPacket
+{
+    L3Address address;
+    Coord position;
 }
 
 //
