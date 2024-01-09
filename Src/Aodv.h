@@ -173,8 +173,10 @@ class INET_API Aodv : public RoutingProtocolBase, public NetfilterBase::HookBase
     // handling beacons
     const Ptr<GreedyBeacon> createBeacon();
     void sendBeacon(const Ptr<GreedyBeacon>& beacon);
-    void processBeacon(Packet *packet);
+    void processBeacon(const Ptr<GreedyBeacon> &beacon);
 
+    // configuration
+    void configureInterfaces();
 
     // position
     Coord lookupPositionInGlobalRegistry(const L3Address& address) const;

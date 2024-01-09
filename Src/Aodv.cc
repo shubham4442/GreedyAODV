@@ -52,14 +52,24 @@ namespace inet
 
         void Aodv::initialize(int stage)
         {
-            if (stage == INITSTAGE_ROUTING_PROTOCOLS)
-                addressType = getSelfIPAddress().getAddressType(); // needed for handleStartOperation()
+            // Logging
+            std::ofstream ologfile;
+            ologfile.open("Logs_AoDV.txt", std::ios::app);
+            std::string ologline = "Logging method initialize";
+            ologfile << ologline << std::endl;
 
+            if (stage == INITSTAGE_ROUTING_PROTOCOLS)
+            {
+                ologfile << "For INITSTATGE_ROUTIG_PROTOCOL, this is same so must not crash" << std::endl;
+                addressType = getSelfIPAddress().getAddressType(); // needed for handleStartOperation()
+            }
+            ologfile << "Going to initialize of routing base for stage " << std::endl;
             RoutingProtocolBase::initialize(stage);
 
             if (stage == INITSTAGE_LOCAL)
             {
                 // greedy
+                ologfile << "For INITSTAGE_LOCAL, lets see for diff variable" << std::endl;
                 interfaces = par("interfaces");
                 beaconInterval = par("beaconInterval");
                 maxJitter = par("maxJitter");
@@ -67,7 +77,9 @@ namespace inet
                 displayBubbles = par("displayBubbles");
                 // context
                 outputInterface = par("outputInterface");
+                host = getContainingNode(this); // leads to crash
                 mobility = check_and_cast<IMobility *>(host->getSubmodule("mobility"));
+                ologfile << "worked for context" << std::endl;
                 // internal
                 beaconTimer = new cMessage("BeaconTimer");
                 purgeNeighborsTimer = new cMessage("PurgeNeighborsTimer");
@@ -76,12 +88,13 @@ namespace inet
                 // KLUDGE implement position registry protocol
                 globalPositionTable.clear();
 
+                ologfile << "succesfully initiated greedy params" << std::endl;
                 // aodv
                 lastBroadcastTime = SIMTIME_ZERO;
                 rebootTime = SIMTIME_ZERO;
                 rreqId = sequenceNum = 0;
                 rreqCount = rerrCount = 0;
-                host = getContainingNode(this);
+
                 routingTable.reference(this, "routingTableModule", true);
                 interfaceTable.reference(this, "interfaceTableModule", true);
                 networkProtocol.reference(this, "networkProtocolModule", true);
@@ -121,27 +134,32 @@ namespace inet
             }
             else if (stage == INITSTAGE_ROUTING_PROTOCOLS)
             {
+                ologfile << "getting into INITSTAGE_ROUTING_PROTOCOLS" << std::endl;
                 registerProtocol(Protocol::manet, gate("socketOut"), gate("socketIn"));
+                ologfile << "" << std::endl;
                 networkProtocol->registerHook(0, this);
                 host->subscribe(linkBrokenSignal, this);
                 usingIpv6 = (routingTable->getRouterIdAsGeneric().getType() == L3Address::IPv6);
                 WATCH(neighborPositionTable);
             }
             // Logging
-            std::ofstream ofile;
-            ofile.open("Logs_AoDV.txt", std::ios::app);
-            std::string add = getSelfIPAddress().str();
-            std::string oline = "I am in initialize for host number" + add;
-            ofile << oline << std::endl;
 
-            ofile.close();
+            std::string add = getSelfIPAddress().str();
+            std::string oline = "I am at end of initialize for host number" + add;
+            ologfile << oline << std::endl;
+
+
+            ologfile.close();
         }
 
         void Aodv::handleMessageWhenUp(cMessage *msg)
         {
+            // Logging
+            EV_DETAIL << "Entered Method handleMessageWhenUp for node " << getSelfIPAddress() << endl;
 
             if (msg->isSelfMessage())
             {
+                 EV_DETAIL << "Handling Self message " << msg << endl;
                 if (auto waitForRrep = dynamic_cast<WaitForRrep *>(msg))
                     handleWaitForRREP(waitForRrep);
                 else if (msg == helloMsgTimer)
@@ -164,7 +182,8 @@ namespace inet
                     delete timer;
                 }
                 else if (msg == beaconTimer) // greedy
-                    processBeaconTimer();
+                    {EV_DETAIL << "Beaconing start " << msg << endl;
+                    processBeaconTimer();}
                 else if (msg == purgeNeighborsTimer)
                     processPurgeNeighborsTimer();
                 else
@@ -176,6 +195,21 @@ namespace inet
 
         //=================================================================================
 
+        //
+        // configuration
+        //
+
+        void Aodv::configureInterfaces()
+        {
+            // join multicast groups
+            cPatternMatcher interfaceMatcher(interfaces, false, true, false);
+            for (int i = 0; i < interfaceTable->getNumInterfaces(); i++)
+            {
+                NetworkInterface *networkInterface = interfaceTable->getInterface(i);
+                if (networkInterface->isMulticast() && interfaceMatcher.matches(networkInterface->getInterfaceName()))
+                    networkInterface->joinMulticastGroup(addressType->getLinkLocalManetRoutersMulticastAddress());
+            }
+        }
         //
         // beacon timers
         //
@@ -201,6 +235,7 @@ namespace inet
 
         void Aodv::storeSelfPositionInGlobalRegistry() const
         {
+            EV_DETAIL << "storing self position in global repository for " << getSelfIPAddress() << "and position " << mobility->getCurrentPosition() << endl;
             auto selfAddress = getSelfIPAddress();
             if (!selfAddress.isUnspecified())
                 storePositionInGlobalRegistry(selfAddress, mobility->getCurrentPosition());
@@ -249,40 +284,46 @@ namespace inet
             const auto &beacon = makeShared<GreedyBeacon>();
             beacon->setAddress(getSelfIPAddress());
             beacon->setPosition(mobility->getCurrentPosition());
-            beacon->setChunkLength(B(getSelfIPAddress().getAddressType()->getAddressByteLength() + positionByteLength));
+            beacon->setPacketType(GREEDY_BEACON);
+            beacon->setChunkLength(B(getSelfIPAddress().getAddressType()->getAddressByteLength() + positionByteLength + 4));
             return beacon;
         }
 
         void Aodv::sendUdpPacket(Packet *packet)
         {
+            EV_INFO << "Sending anything? " << endl;
             send(packet, "socketOut");
         }
 
         void Aodv::sendBeacon(const Ptr<GreedyBeacon> &beacon)
         {
             EV_INFO << "Sending beacon: address = " << beacon->getAddress() << ", position = " << beacon->getPosition() << endl;
-            Packet *udpPacket = new Packet("GreedyBeacon");
-            udpPacket->insertAtBack(beacon);
-            auto udpHeader = makeShared<UdpHeader>();
-            udpHeader->setSourcePort(GREEDY_UDP_PORT); // what is this
-            udpHeader->setDestinationPort(GREEDY_UDP_PORT);
-            udpHeader->setCrcMode(CRC_DISABLED);
-            udpPacket->insertAtFront(udpHeader);
-            auto addresses = udpPacket->addTag<L3AddressReq>();
+            const Ptr<AodvControlPacket> &aodvPacket = beacon;
+            const char *className = aodvPacket->getClassName();
+            Packet *packet = new Packet(className, aodvPacket);
+            packet->addTag<L4PortReq>()->setDestPort(GREEDY_UDP_PORT);
+            //Packet *udpPacket = new Packet("GreedyBeacon");
+            //udpPacket->insertAtBack(beacon);
+            //auto udpHeader = makeShared<UdpHeader>();
+            //udpHeader->setSourcePort(GREEDY_UDP_PORT); // what is this
+            //udpHeader->setDestinationPort(GREEDY_UDP_PORT);
+            //udpHeader->setCrcMode(CRC_DISABLED);
+            //udpPacket->insertAtFront(udpHeader);
+            auto addresses = packet->addTag<L3AddressReq>();
             addresses->setSrcAddress(getSelfIPAddress());
             addresses->setDestAddress(addressType->getLinkLocalManetRoutersMulticastAddress());
-            udpPacket->addTag<HopLimitReq>()->setHopLimit(255);
-            udpPacket->addTag<PacketProtocolTag>()->setProtocol(&Protocol::manet);
-            udpPacket->addTag<DispatchProtocolReq>()->setProtocol(addressType->getNetworkProtocol());
-            sendUdpPacket(udpPacket);
+            packet->addTag<HopLimitReq>()->setHopLimit(255);
+            packet->addTag<PacketProtocolTag>()->setProtocol(&Protocol::manet);
+            packet->addTag<DispatchProtocolReq>()->setProtocol(addressType->getNetworkProtocol());
+            sendUdpPacket(packet);
         }
 
-        void Aodv::processBeacon(Packet *packet)
+        void Aodv::processBeacon(const Ptr<GreedyBeacon> &beacon)
         {
-            const auto &beacon = packet->peekAtFront<GreedyBeacon>();
+            //const auto &beacon = packet->peekAtFront<GreedyBeacon>();
             EV_INFO << "Processing beacon: address = " << beacon->getAddress() << ", position = " << beacon->getPosition() << endl;
             neighborPositionTable.setPosition(beacon->getAddress(), beacon->getPosition());
-            delete packet;
+            //delete packet;
         }
 
         Coord Aodv::lookupPositionInGlobalRegistry(const L3Address &address) const
@@ -323,8 +364,8 @@ namespace inet
         {
             // routingMode
             int routingModeBytes = 1;
-            // destinationPosition, perimeterRoutingStartPosition, perimeterRoutingForwardPosition
-            int positionsBytes = 3 * positionByteLength;
+            // destinationPosition
+            int positionsBytes =  positionByteLength;
             // type and length
             int tlBytes = 1 + 1;
 
@@ -463,55 +504,60 @@ namespace inet
 
         void Aodv::processPacket(Packet *packet)
         {
-            const auto &beacon = packet->peekAtFront<GreedyBeacon>();
-            if (beacon != nullptr) // to implement
+
+
+            L3Address sourceAddr = packet->getTag<L3AddressInd>()->getSrcAddress();
+            // KLUDGE I added this -1 after TTL decrement has been moved in Ipv4
+            unsigned int arrivalPacketTTL = packet->getTag<HopLimitInd>()->getHopLimit() - 1;
+            const auto &aodvPacket = packet->popAtFront<AodvControlPacket>();
+            // TODO aodvPacket->copyTags(*udpPacket);
+
+            auto packetType = aodvPacket->getPacketType();
+
+            // Logging
+            
+            switch (packetType)
             {
-                processBeacon(packet);
+            case RREQ:
+            case RREQ_IPv6:
+                checkIpVersionAndPacketTypeCompatibility(packetType);
+                handleRREQ(CHK(dynamicPtrCast<Rreq>(aodvPacket->dupShared())), sourceAddr, arrivalPacketTTL);
+                delete packet;
+                return;
+
+            case RREP:
+            case RREP_IPv6:
+                checkIpVersionAndPacketTypeCompatibility(packetType);
+                handleRREP(CHK(dynamicPtrCast<Rrep>(aodvPacket->dupShared())), sourceAddr);
+                delete packet;
+                return;
+
+            case RERR:
+            case RERR_IPv6:
+                checkIpVersionAndPacketTypeCompatibility(packetType);
+                handleRERR(CHK(dynamicPtrCast<const Rerr>(aodvPacket)), sourceAddr);
+                delete packet;
+                return;
+
+            case RREPACK:
+            case RREPACK_IPv6:
+                checkIpVersionAndPacketTypeCompatibility(packetType);
+                handleRREPACK(CHK(dynamicPtrCast<const RrepAck>(aodvPacket)), sourceAddr);
+                delete packet;
+                return;
+
+            case GREEDY_BEACON:
+                EV_DEBUG << "recieved greedy beacon at " << getSelfIPAddress() << endl;
+                processBeacon(CHK(dynamicPtrCast<GreedyBeacon>(aodvPacket->dupShared())));
                 schedulePurgeNeighborsTimer();
+                delete packet;
+                return;
+
+            default:
+                throw cRuntimeError("AODV Control Packet arrived with undefined packet type: %d", packetType);
             }
-            else
-            {
-                L3Address sourceAddr = packet->getTag<L3AddressInd>()->getSrcAddress();
-                // KLUDGE I added this -1 after TTL decrement has been moved in Ipv4
-                unsigned int arrivalPacketTTL = packet->getTag<HopLimitInd>()->getHopLimit() - 1;
-                const auto &aodvPacket = packet->popAtFront<AodvControlPacket>();
-                // TODO aodvPacket->copyTags(*udpPacket);
 
-                auto packetType = aodvPacket->getPacketType();
-                switch (packetType)
-                {
-                case RREQ:
-                case RREQ_IPv6:
-                    checkIpVersionAndPacketTypeCompatibility(packetType);
-                    handleRREQ(CHK(dynamicPtrCast<Rreq>(aodvPacket->dupShared())), sourceAddr, arrivalPacketTTL);
-                    delete packet;
-                    return;
-
-                case RREP:
-                case RREP_IPv6:
-                    checkIpVersionAndPacketTypeCompatibility(packetType);
-                    handleRREP(CHK(dynamicPtrCast<Rrep>(aodvPacket->dupShared())), sourceAddr);
-                    delete packet;
-                    return;
-
-                case RERR:
-                case RERR_IPv6:
-                    checkIpVersionAndPacketTypeCompatibility(packetType);
-                    handleRERR(CHK(dynamicPtrCast<const Rerr>(aodvPacket)), sourceAddr);
-                    delete packet;
-                    return;
-
-                case RREPACK:
-                case RREPACK_IPv6:
-                    checkIpVersionAndPacketTypeCompatibility(packetType);
-                    handleRREPACK(CHK(dynamicPtrCast<const RrepAck>(aodvPacket)), sourceAddr);
-                    delete packet;
-                    return;
-
-                default:
-                    throw cRuntimeError("AODV Control Packet arrived with undefined packet type: %d", packetType);
-                }
-            }
+            
         }
 
         INetfilter::IHook::Result Aodv::ensureRouteForDatagram(Packet *datagram)
@@ -574,6 +620,12 @@ namespace inet
 
         Aodv::Aodv()
         {
+            // Logging
+            std::ofstream ologfile;
+            ologfile.open("Logs_AoDV.txt", std::ios::app);
+            std::string ologline = "Logging method constructor for host number";
+            ologfile << ologline << std::endl;
+            ologfile.close();
         }
 
         bool Aodv::hasOngoingRouteDiscovery(const L3Address &target)
@@ -592,7 +644,25 @@ namespace inet
 
         L3Address Aodv::getSelfIPAddress() const
         {
-            return routingTable->getRouterIdAsGeneric();
+            L3Address ret = routingTable->getRouterIdAsGeneric();
+            #ifdef INET_WITH_IPv6
+            if (ret.getType() == L3Address::IPv6)
+            {
+                for (int i = 0; i < interfaceTable->getNumInterfaces(); i++)
+                {
+                    NetworkInterface *ie = interfaceTable->getInterface(i);
+                    if ((!ie->isLoopback()))
+                    {
+                        if (auto ipv6Data = ie->findProtocolData<Ipv6InterfaceData>())
+                        {
+                            ret = ipv6Data->getPreferredAddress();
+                            break;
+                        }
+                    }
+                }
+            }
+            #endif
+            return ret;
         }
 
         void Aodv::delayDatagram(Packet *datagram)
@@ -1126,18 +1196,36 @@ namespace inet
 
         void Aodv::socketDataArrived(UdpSocket *socket, Packet *packet)
         {
+            // Logging
+            std::ofstream ologfile;
+            ologfile.open("Logs_AoDV.txt", std::ios::app);
+            std::string ologline = "Logging method socketdataarrived for host number";
+            ologfile << ologline << std::endl;
+            ologfile.close();
             // process incoming packet
             processPacket(packet);
         }
 
         void Aodv::socketErrorArrived(UdpSocket *socket, Indication *indication)
         {
+            // Logging
+            std::ofstream ologfile;
+            ologfile.open("Logs_AoDV.txt", std::ios::app);
+            std::string ologline = "Logging method socketerrorarrived for host number";
+            ologfile << ologline << std::endl;
+            ologfile.close();
             EV_WARN << "Ignoring UDP error report " << indication->getName() << endl;
             delete indication;
         }
 
         void Aodv::socketClosed(UdpSocket *socket)
         {
+            // Logging
+            std::ofstream ologfile;
+            ologfile.open("Logs_AoDV.txt", std::ios::app);
+            std::string ologline = "Logging method socketclosed for host number";
+            ologfile << ologline << std::endl;
+            ologfile.close();
             if (operationalState == State::STOPPING_OPERATION)
                 startActiveOperationExtraTimeOrFinish(par("stopOperationExtraTime"));
         }
@@ -1394,6 +1482,13 @@ namespace inet
 
         void Aodv::receiveSignal(cComponent *source, simsignal_t signalID, cObject *obj, cObject *details)
         {
+            // Logging
+            std::ofstream ologfile;
+            ologfile.open("Logs_AoDV.txt", std::ios::app);
+            std::string ologline = "Logging method recievesignal for host number";
+            ologfile << ologline << std::endl;
+            ologfile.close();
+
             Enter_Method("%s", cComponent::getSignalName(signalID));
 
             if (signalID == linkBrokenSignal)
@@ -1605,6 +1700,18 @@ namespace inet
 
         void Aodv::handleStartOperation(LifecycleOperation *operation)
         {
+            // Logging
+            std::ofstream ologfile;
+            ologfile.open("Logs_AoDV.txt", std::ios::app);
+            std::string ologline = "Logging method handleStartOperation for host number";
+            ologfile << ologline << std::endl;
+            ologfile.close();
+            EV_INFO << "Method handleStartOperation" << endl;
+
+            configureInterfaces();
+            storeSelfPositionInGlobalRegistry();
+            scheduleBeaconTimer();
+
             rebootTime = simTime();
 
             socket.setOutputGate(gate("socketOut"));
@@ -1624,18 +1731,47 @@ namespace inet
 
         void Aodv::handleStopOperation(LifecycleOperation *operation)
         {
+            // Logging
+            std::ofstream ologfile;
+            ologfile.open("Logs_AoDV.txt", std::ios::app);
+            std::string ologline = "Logging method handleStopOperation for host number";
+            ologfile << ologline << std::endl;
+            ologfile.close();
+
+            neighborPositionTable.clear();
+            cancelEvent(beaconTimer);
+            cancelEvent(purgeNeighborsTimer);
+
             socket.close();
             clearState();
         }
 
         void Aodv::handleCrashOperation(LifecycleOperation *operation)
         {
+            // Logging
+            std::ofstream ologfile;
+            ologfile.open("Logs_AoDV.txt", std::ios::app);
+            std::string ologline = "Logging method handlecrashOperation for host number";
+            ologfile << ologline << std::endl;
+            ologfile.close();
+
+            neighborPositionTable.clear();
+            cancelEvent(beaconTimer);
+            cancelEvent(purgeNeighborsTimer);
+
             socket.destroy();
             clearState();
         }
 
         void Aodv::clearState()
         {
+            // Logging
+            std::ofstream ologfile;
+            ologfile.open("Logs_AoDV.txt", std::ios::app);
+            std::string ologline = "Logging method clearstate for host number";
+            ologfile << ologline << std::endl;
+            ologfile.close();
+
             rerrCount = rreqCount = rreqId = sequenceNum = 0;
             addressToRreqRetries.clear();
             for (auto &elem : waitForRREPTimers)
@@ -1921,7 +2057,7 @@ namespace inet
             const auto &networkHeader = getNetworkProtocolHeader(datagram);
             const L3Address &source = networkHeader->getSourceAddress();
             const L3Address &destination = networkHeader->getDestinationAddress();
-            EV_INFO << "Finding next hop: source = " << source << ", destination = " << destination << endl;
+            EV_INFO << "Finding next hop: source = " << source << ", destination = " << destination << " and current node " << getSelfIPAddress() << endl;
             auto nextHop = findGreedyRoutingNextHop(destination, greedyOption);
             if (nextHop.isUnspecified())
             {
@@ -1947,12 +2083,16 @@ namespace inet
             L3Address selfAddress = getSelfIPAddress();
             Coord selfPosition = mobility->getCurrentPosition();
             Coord destinationPosition = greedyOption->getDestinationPosition();
+            EV_DETAIL << "position logging selpositon :  " << selfPosition<< "destination position :" << destinationPosition << endl;
+
             double bestDistance = (destinationPosition - selfPosition).length();
             L3Address bestNeighbor;
             std::vector<L3Address> neighborAddresses = neighborPositionTable.getAddresses();
+            EV_INFO << "neighbours : " << neighborAddresses.size() << endl;
             for (auto &neighborAddress : neighborAddresses)
             {
                 Coord neighborPosition = neighborPositionTable.getPosition(neighborAddress);
+                EV_DETAIL << " nieghbour positon :  " << neighborPosition << endl;
                 double neighborDistance = (destinationPosition - neighborPosition).length();
                 if (neighborDistance < bestDistance)
                 {
@@ -1973,7 +2113,10 @@ namespace inet
 
         INetfilter::IHook::Result Aodv::datagramPreRoutingHook(Packet *datagram)
         {
+            // Logging
+            
             Enter_Method("datagramPreRoutingHook");
+             EV_INFO << "Method datagramPreRoutingHook " << endl;
             // we get a call from lower layer, so I check the greedy mode here
 
             // ensureRouteForDatagram 
@@ -1988,7 +2131,7 @@ namespace inet
                 return ACCEPT;
             else
             {
-                EV_INFO << "Finding route for source " << sourceAddr << " with destination " << destAddr << endl;
+                EV_INFO << "Finding route for source " << sourceAddr << " with destination " << destAddr << "current node is " << getSelfIPAddress() << endl;
                 IRoute *route = routingTable->findBestMatchingRoute(destAddr);
                 AodvRouteData *routeData = route ? dynamic_cast<AodvRouteData *>(route->getProtocolData()) : nullptr;
                 bool isActive = routeData && routeData->isActive();
@@ -2009,15 +2152,19 @@ namespace inet
                 else
                 {
                     // Check if route possible with Greedy routing
+                    
                     auto greedyOption = const_cast<GreedyOption *>(getGreedyOptionFromNetworkDatagram(networkHeader));
                     auto mode = greedyOption->getRoutingMode();
+                    EV_DETAIL << "checking if route possible with greedy routing " << endl;
                     if (mode == GREEDY_ROUTING)
                     {
+                        EV_DETAIL << "Mode is greedy " << endl;
                         if (routeDatagram(datagram, greedyOption))
                             return ACCEPT;
                         else
                             greedyOption->setRoutingMode(AODV_ROUTING);
                     }
+                    
 
                     bool isInactive = routeData && !routeData->isActive();
                     // A node disseminates a RREQ when it determines that it needs a route
@@ -2049,6 +2196,7 @@ namespace inet
 
         INetfilter::IHook::Result Aodv::datagramLocalOutHook(Packet *datagram)
         {
+
             Enter_Method("datagramLocalOutHook");
             // we get a call from upper layer, so I set the greedy mode on here
 
@@ -2064,7 +2212,8 @@ namespace inet
                 return ACCEPT;
             else
             {
-                EV_INFO << "Finding route for source " << sourceAddr << " with destination " << destAddr << endl;
+                EV_INFO << "Method datagramLocalOutHook" << endl;
+                EV_INFO << "Finding route for source " << sourceAddr << " with destination " << destAddr << "current node is "<< getSelfIPAddress() <<endl;
                 IRoute *route = routingTable->findBestMatchingRoute(destAddr);
                 AodvRouteData *routeData = route ? dynamic_cast<AodvRouteData *>(route->getProtocolData()) : nullptr;
                 bool isActive = routeData && routeData->isActive();
@@ -2123,6 +2272,8 @@ namespace inet
 
         INetfilter::IHook::Result Aodv::datagramForwardHook(Packet *datagram)
         {
+            
+
             // TODO Implement: Actions After Reboot
             // If the node receives a data packet for some other destination, it SHOULD
             // broadcast a RERR as described in subsection 6.11 and MUST reset the waiting
@@ -2337,6 +2488,13 @@ namespace inet
 
         Aodv::~Aodv()
         {
+// Logging
+            std::ofstream ologfile;
+            ologfile.open("Logs_AoDV.txt", std::ios::app);
+            std::string ologline = "Logging method destructor for host number";
+            ologfile << ologline << std::endl;
+            ologfile.close();
+
             cancelAndDelete(beaconTimer);
             cancelAndDelete(purgeNeighborsTimer);
             clearState();
