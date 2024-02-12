@@ -29,6 +29,8 @@ import inet.applications.contract.IApp;
 simple Aodv like IApp
 {
     parameters:
+        @signal[RREQ_traffic](type="long");
+        @statistic[iNumRREQ](title="RREQ message count"; source="RREQ_traffic"; record=vector,stats; interpolationmode=none);
         @class("aodv::Aodv");
         @display("i=block/network2");
         string routingTableModule = default("^.ipv4.routingTable");

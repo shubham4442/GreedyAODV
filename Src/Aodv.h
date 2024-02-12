@@ -159,6 +159,10 @@ class INET_API Aodv : public RoutingProtocolBase, public NetfilterBase::HookBase
     // internal
     std::multimap<L3Address, Packet *> targetAddressToDelayedPackets; // queue for the datagrams we have no route for
 
+    //Measurement
+    simsignal_t RREQ_traffic;
+    int iNumRREQ;
+
     //greedy methods
     // handling beacon timers
     void scheduleBeaconTimer();
