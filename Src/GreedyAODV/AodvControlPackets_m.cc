@@ -1310,8 +1310,6 @@ void Rreq::copy(const Rreq& other)
     this->destSeqNum = other.destSeqNum;
     this->originatorAddr = other.originatorAddr;
     this->originatorSeqNum = other.originatorSeqNum;
-    this->searchRadius = other.searchRadius;
-    this->originatorPos = other.originatorPos;
 }
 
 void Rreq::parsimPack(omnetpp::cCommBuffer *b) const
@@ -1329,8 +1327,6 @@ void Rreq::parsimPack(omnetpp::cCommBuffer *b) const
     doParsimPacking(b,this->destSeqNum);
     doParsimPacking(b,this->originatorAddr);
     doParsimPacking(b,this->originatorSeqNum);
-    doParsimPacking(b,this->searchRadius);
-    doParsimPacking(b,this->originatorPos);
 }
 
 void Rreq::parsimUnpack(omnetpp::cCommBuffer *b)
@@ -1348,8 +1344,6 @@ void Rreq::parsimUnpack(omnetpp::cCommBuffer *b)
     doParsimUnpacking(b,this->destSeqNum);
     doParsimUnpacking(b,this->originatorAddr);
     doParsimUnpacking(b,this->originatorSeqNum);
-    doParsimUnpacking(b,this->searchRadius);
-    doParsimUnpacking(b,this->originatorPos);
 }
 
 bool Rreq::getJoinFlag() const
@@ -1484,28 +1478,6 @@ void Rreq::setOriginatorSeqNum(uint32_t originatorSeqNum)
     this->originatorSeqNum = originatorSeqNum;
 }
 
-double Rreq::getSearchRadius() const
-{
-    return this->searchRadius;
-}
-
-void Rreq::setSearchRadius(double searchRadius)
-{
-    handleChange();
-    this->searchRadius = searchRadius;
-}
-
-const ::inet::Coord& Rreq::getOriginatorPos() const
-{
-    return this->originatorPos;
-}
-
-void Rreq::setOriginatorPos(const ::inet::Coord& originatorPos)
-{
-    handleChange();
-    this->originatorPos = originatorPos;
-}
-
 class RreqDescriptor : public omnetpp::cClassDescriptor
 {
   private:
@@ -1523,8 +1495,6 @@ class RreqDescriptor : public omnetpp::cClassDescriptor
         FIELD_destSeqNum,
         FIELD_originatorAddr,
         FIELD_originatorSeqNum,
-        FIELD_searchRadius,
-        FIELD_originatorPos,
     };
   public:
     RreqDescriptor();
@@ -1591,7 +1561,7 @@ const char *RreqDescriptor::getProperty(const char *propertyName) const
 int RreqDescriptor::getFieldCount() const
 {
     omnetpp::cClassDescriptor *base = getBaseClassDescriptor();
-    return base ? 14+base->getFieldCount() : 14;
+    return base ? 12+base->getFieldCount() : 12;
 }
 
 unsigned int RreqDescriptor::getFieldTypeFlags(int field) const
@@ -1615,10 +1585,8 @@ unsigned int RreqDescriptor::getFieldTypeFlags(int field) const
         FD_ISEDITABLE,    // FIELD_destSeqNum
         0,    // FIELD_originatorAddr
         FD_ISEDITABLE,    // FIELD_originatorSeqNum
-        FD_ISEDITABLE,    // FIELD_searchRadius
-        FD_ISCOMPOUND,    // FIELD_originatorPos
     };
-    return (field >= 0 && field < 14) ? fieldTypeFlags[field] : 0;
+    return (field >= 0 && field < 12) ? fieldTypeFlags[field] : 0;
 }
 
 const char *RreqDescriptor::getFieldName(int field) const
@@ -1642,10 +1610,8 @@ const char *RreqDescriptor::getFieldName(int field) const
         "destSeqNum",
         "originatorAddr",
         "originatorSeqNum",
-        "searchRadius",
-        "originatorPos",
     };
-    return (field >= 0 && field < 14) ? fieldNames[field] : nullptr;
+    return (field >= 0 && field < 12) ? fieldNames[field] : nullptr;
 }
 
 int RreqDescriptor::findField(const char *fieldName) const
@@ -1664,8 +1630,6 @@ int RreqDescriptor::findField(const char *fieldName) const
     if (strcmp(fieldName, "destSeqNum") == 0) return baseIndex + 9;
     if (strcmp(fieldName, "originatorAddr") == 0) return baseIndex + 10;
     if (strcmp(fieldName, "originatorSeqNum") == 0) return baseIndex + 11;
-    if (strcmp(fieldName, "searchRadius") == 0) return baseIndex + 12;
-    if (strcmp(fieldName, "originatorPos") == 0) return baseIndex + 13;
     return base ? base->findField(fieldName) : -1;
 }
 
@@ -1690,10 +1654,8 @@ const char *RreqDescriptor::getFieldTypeString(int field) const
         "uint32_t",    // FIELD_destSeqNum
         "inet::L3Address",    // FIELD_originatorAddr
         "uint32_t",    // FIELD_originatorSeqNum
-        "double",    // FIELD_searchRadius
-        "inet::Coord",    // FIELD_originatorPos
     };
-    return (field >= 0 && field < 14) ? fieldTypeStrings[field] : nullptr;
+    return (field >= 0 && field < 12) ? fieldTypeStrings[field] : nullptr;
 }
 
 const char **RreqDescriptor::getFieldPropertyNames(int field) const
@@ -1788,8 +1750,6 @@ std::string RreqDescriptor::getFieldValueAsString(omnetpp::any_ptr object, int f
         case FIELD_destSeqNum: return ulong2string(pp->getDestSeqNum());
         case FIELD_originatorAddr: return pp->getOriginatorAddr().str();
         case FIELD_originatorSeqNum: return ulong2string(pp->getOriginatorSeqNum());
-        case FIELD_searchRadius: return double2string(pp->getSearchRadius());
-        case FIELD_originatorPos: return pp->getOriginatorPos().str();
         default: return "";
     }
 }
@@ -1816,7 +1776,6 @@ void RreqDescriptor::setFieldValueAsString(omnetpp::any_ptr object, int field, i
         case FIELD_rreqId: pp->setRreqId(string2ulong(value)); break;
         case FIELD_destSeqNum: pp->setDestSeqNum(string2ulong(value)); break;
         case FIELD_originatorSeqNum: pp->setOriginatorSeqNum(string2ulong(value)); break;
-        case FIELD_searchRadius: pp->setSearchRadius(string2double(value)); break;
         default: throw omnetpp::cRuntimeError("Cannot set field %d of class 'Rreq'", field);
     }
 }
@@ -1843,8 +1802,6 @@ omnetpp::cValue RreqDescriptor::getFieldValue(omnetpp::any_ptr object, int field
         case FIELD_destSeqNum: return (omnetpp::intval_t)(pp->getDestSeqNum());
         case FIELD_originatorAddr: return omnetpp::toAnyPtr(&pp->getOriginatorAddr()); break;
         case FIELD_originatorSeqNum: return (omnetpp::intval_t)(pp->getOriginatorSeqNum());
-        case FIELD_searchRadius: return pp->getSearchRadius();
-        case FIELD_originatorPos: return omnetpp::toAnyPtr(&pp->getOriginatorPos()); break;
         default: throw omnetpp::cRuntimeError("Cannot return field %d of class 'Rreq' as cValue -- field index out of range?", field);
     }
 }
@@ -1871,7 +1828,6 @@ void RreqDescriptor::setFieldValue(omnetpp::any_ptr object, int field, int i, co
         case FIELD_rreqId: pp->setRreqId(omnetpp::checked_int_cast<uint32_t>(value.intValue())); break;
         case FIELD_destSeqNum: pp->setDestSeqNum(omnetpp::checked_int_cast<uint32_t>(value.intValue())); break;
         case FIELD_originatorSeqNum: pp->setOriginatorSeqNum(omnetpp::checked_int_cast<uint32_t>(value.intValue())); break;
-        case FIELD_searchRadius: pp->setSearchRadius(value.doubleValue()); break;
         default: throw omnetpp::cRuntimeError("Cannot set field %d of class 'Rreq'", field);
     }
 }
@@ -1885,7 +1841,6 @@ const char *RreqDescriptor::getFieldStructName(int field) const
         field -= base->getFieldCount();
     }
     switch (field) {
-        case FIELD_originatorPos: return omnetpp::opp_typename(typeid(::inet::Coord));
         default: return nullptr;
     };
 }
@@ -1902,7 +1857,6 @@ omnetpp::any_ptr RreqDescriptor::getFieldStructValuePointer(omnetpp::any_ptr obj
     switch (field) {
         case FIELD_destAddr: return omnetpp::toAnyPtr(&pp->getDestAddr()); break;
         case FIELD_originatorAddr: return omnetpp::toAnyPtr(&pp->getOriginatorAddr()); break;
-        case FIELD_originatorPos: return omnetpp::toAnyPtr(&pp->getOriginatorPos()); break;
         default: return omnetpp::any_ptr(nullptr);
     }
 }

@@ -17,12 +17,14 @@
 #define __INET_AODV_H
 
 #include <map>
+#include <string.h>
 
 #include "inet/common/ModuleRefByPar.h"
 #include "inet/networklayer/contract/IInterfaceTable.h"
 #include "inet/mobility/contract/IMobility.h"
 #include "inet/common/geometry/common/Coord.h"
 #include "inet/routing/gpsr/PositionTable.h"
+#include "inet/routing/aodv/QTable.h"
 #include "inet/networklayer/contract/IL3AddressType.h"
 #include "inet/networklayer/contract/INetfilter.h"
 #include "inet/networklayer/contract/IRoutingTable.h"
@@ -90,10 +92,6 @@ class INET_API Aodv : public RoutingProtocolBase, public NetfilterBase::HookBase
     UdpSocket socket;
     bool usingIpv6 = false;
 
-    //signal
-    simsignal_t  CtrlPckSignal;
-    int iCtrlPcktCount;
-
     //greedy
     opp_component_ptr<IMobility> mobility;
     PositionTable& globalPositionTable = SIMULATION_SHARED_VARIABLE(globalPositionTable); // KLUDGE implement position registry protocol
@@ -104,6 +102,10 @@ class INET_API Aodv : public RoutingProtocolBase, public NetfilterBase::HookBase
     //global q-table
     // exporting in finish method, importing in constructor or initialization
     // what could be parameters for state - extent of concavity, remaining distance, nb of neighbours, size of radius 
+
+    // Reinforcement Learning
+    QTable & qTable = SIMULATION_SHARED_VARIABLE(qTable); 
+    Coord destPos;
 
 
     const char *outputInterface = nullptr;
@@ -168,6 +170,13 @@ class INET_API Aodv : public RoutingProtocolBase, public NetfilterBase::HookBase
     // internal
     std::multimap<L3Address, Packet *> targetAddressToDelayedPackets; // queue for the datagrams we have no route for
 
+    //Measurement and Logging 
+    simsignal_t RREQ_traffic;
+    int iNumRREQ;
+        //signal
+    simsignal_t  CtrlPckSignal;
+    int iCtrlPcktCount;
+    void LogValue(std::string val );
 
     //greedy methods
     // handling beacon timers

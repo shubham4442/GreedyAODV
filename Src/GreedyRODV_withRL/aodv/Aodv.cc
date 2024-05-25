@@ -50,6 +50,16 @@ namespace inet
 
         const int KIND_DELAYEDSEND = 100;
 
+        void Aodv::LogValue(std::string val)
+        {
+            // Logging
+            std::ofstream ologfile;
+            ologfile.open("Logs_AoDV.txt", std::ios::app);
+            ologfile << getSelfIPAddress() << " "<< val << std::endl;
+            ologfile.close();
+
+        }
+
         void Aodv::initialize(int stage)
         {
             // Logging
@@ -58,12 +68,10 @@ namespace inet
             std::string ologline = "Logging method initialize";
             ologfile << ologline << std::endl;
             ologfile.close();
-            
+
             // signals
     		CtrlPckSignal = registerSignal("ctrlPckCount");
     		iCtrlPcktCount = 0;
-
-            
 
             if (stage == INITSTAGE_ROUTING_PROTOCOLS)
             {
@@ -97,6 +105,7 @@ namespace inet
                 rebootTime = SIMTIME_ZERO;
                 rreqId = sequenceNum = 0;
                 rreqCount = rerrCount = 0;
+
                 routingTable.reference(this, "routingTableModule", true);
                 interfaceTable.reference(this, "interfaceTableModule", true);
                 networkProtocol.reference(this, "networkProtocolModule", true);
@@ -151,12 +160,6 @@ namespace inet
         {
             EV_DEBUG << "Entered Method handleMessageWhenUp for node " << getSelfIPAddress() << endl;
 
-            // Logging
-            std::ofstream ologfile;
-            ologfile.open("Logs_AoDV.txt", std::ios::app);
-            //std::string ologline = "Logging method processpacket, and the type of msg RREQ = 1, greedy beacon = 21, for host number ";
-            ologfile << "Logging method handlemessagewhenup for " << getSelfIPAddress()  << std::endl;
-            ologfile.close();
             if (msg->isSelfMessage())
             {
                 EV_DETAIL << "Handling Self message " << msg << endl;
@@ -513,12 +516,6 @@ namespace inet
             // TODO aodvPacket->copyTags(*udpPacket);
 
             auto packetType = aodvPacket->getPacketType();
-            // Logging
-            //std::ofstream ologfile;
-            //ologfile.open("Logs_AoDV.txt", std::ios::app);
-            //std::string ologline = "Logging method processpacket, and the type of msg RREQ = 1, greedy beacon = 21, for host number ";
-            //ologfile << ologline << getSelfIPAddress() << " it is = " << packetType << std::endl;
-            //ologfile.close();
 
             switch (packetType)
             {
@@ -565,7 +562,9 @@ namespace inet
         }
 
         Aodv::Aodv()
+        //qTable(500.0)
         {
+            
         }
 
         bool Aodv::hasOngoingRouteDiscovery(const L3Address &target)
@@ -575,6 +574,8 @@ namespace inet
 
         void Aodv::startRouteDiscovery(const L3Address &target, unsigned timeToLive)
         {
+            // Logging
+            LogValue("Starting Route discovery ...");
             EV_INFO << "Starting route discovery with originator " << getSelfIPAddress() << " and destination " << target << endl;
             ASSERT(!hasOngoingRouteDiscovery(target));
             auto rreq = createRREQ(target);
@@ -760,6 +761,20 @@ namespace inet
             rreqPacket->setOriginatorAddr(getSelfIPAddress());
             rreqPacket->setDestAddr(destAddr);
 
+            //set the origin position and desired search radius from q-Table.
+            Coord selfPosition = mobility->getCurrentPosition();
+            Coord originPos = (selfPosition + destPos)/2;
+            double distance = (selfPosition - destPos).length();
+            // Access q-Table for the best radius
+            LogValue("Logging distance betwwen nodes : " + std::to_string(distance));
+
+            double searchRadius = 500;
+            searchRadius = qTable.getActionFromState(distance);
+            // Logging
+            LogValue("Logging RL Algo... : with origin : " + std::to_string(originPos.getX()) + " , " +std::to_string(originPos.getY())  );
+            LogValue("and search radius : " + std::to_string(searchRadius));
+            rreqPacket->setSearchRadius(searchRadius);
+            rreqPacket->setOriginPos(originPos);
 
             // The RREQ ID field is incremented by one from the last RREQ ID used
             // by the current node. Each node maintains only one RREQ ID.
@@ -1102,13 +1117,10 @@ namespace inet
         void Aodv::sendAODVPacket(const Ptr<AodvControlPacket> &aodvPacket, const L3Address &destAddr, unsigned int timeToLive, double delay)
         {
             ASSERT(timeToLive != 0);
-  		  //signal
+
+            //signal
     		iCtrlPcktCount++;
     		emit(CtrlPckSignal, iCtrlPcktCount);
-    		std::ofstream ofile;
-    		ofile.open("Logs_aodv.txt", std::ios::app);
-    		ofile << "control packet count for "<< getSelfIPAddress() << "is = "<< iCtrlPcktCount<< std::endl;
-    		ofile.close();
 
             const char *className = aodvPacket->getClassName();
             Packet *packet = new Packet(!strncmp("inet::", className, 6) ? className + 6 : className, aodvPacket);
@@ -1156,12 +1168,6 @@ namespace inet
                     << " destination addr: " << rreq->getDestAddr() << endl;
 
             // A node ignores all RREQs received from any node in its blacklist set.
-            // Logging
-            //std::ofstream ologfile;
-            //ologfile.open("Logs_AoDV.txt", std::ios::app);
-            //ologfile << "AODV Route Request arrived with source addr: " << sourceAddr << " originator addr: " << rreq->getOriginatorAddr()
-            //        << " destination addr: " << rreq->getDestAddr() <<std::endl;
-            //ologfile.close();
 
             if (containsKey(blacklist, sourceAddr))
             {
@@ -1191,6 +1197,20 @@ namespace inet
             if (checkRREQArrivalTime != rreqsArrivalTime.end() && simTime() - checkRREQArrivalTime->second <= pathDiscoveryTime)
             {
                 EV_WARN << "The same packet has arrived within PATH_DISCOVERY_TIME= " << pathDiscoveryTime << ". Discarding it" << endl;
+                return;
+            }
+
+            // Here, if the current Node is outside the search Radius, the node Silently
+            // discards the newly recieved RREQ
+            // Search radius is determined in the RREQ message
+            Coord originPos = rreq->getOriginPos();
+            double searchRadius = rreq->getSearchRadius();
+            Coord selfPosition = mobility->getCurrentPosition();
+            double curDistance = (selfPosition - originPos).length();
+            if(curDistance > searchRadius)
+            {
+                EV_WARN << "Packet arrived is outside the determined search area, Discarding it. "<< endl;
+                LogValue(" outside search radius Node : " + getSelfIPAddress().str() + " distance : " + std::to_string(curDistance) + "and search radius : " + std::to_string(searchRadius));
                 return;
             }
 
@@ -1738,10 +1758,7 @@ namespace inet
         {
             EV_DETAIL << "Completing route discovery, originator, target " << target << endl;
             // Logging
-            std::ofstream ologfile;
-            ologfile.open("Logs_AoDV.txt", std::ios::app);
-            ologfile << "Completing route discovery, originator " << getSelfIPAddress() << ", target " << target << endl;
-            ologfile.close();
+            LogValue("Route completed");
 
             ASSERT(hasOngoingRouteDiscovery(target));
 
@@ -1751,6 +1768,14 @@ namespace inet
             //#Since the route discovery is completed, we reinforce the Q-table to selected SEarch Radius
             // Question: how much should be the reinforceent -- inversely propotional to search radius
             // but positive ofcouce
+            // RL
+            Coord selfPosition = mobility->getCurrentPosition();
+            double distance = (selfPosition - destPos).length();
+            double searchRadius = 500; // only for logging
+            searchRadius = qTable.getActionFromState(distance);
+            qTable.updateTable(distance, true);
+            LogValue("qTable updated positively for " + std::to_string(searchRadius) );
+            LogValue(getSelfIPAddress().str());
 
             // reinject the delayed datagrams
             for (auto it = lt; it != ut; it++)
@@ -1976,10 +2001,7 @@ namespace inet
             {
                 EV_INFO << "Greedy Next hop found: source = " << source << ", destination = " << destination << ", nextHop: " << nextHop << endl;
                 // Logging
-                std::ofstream ologfile;
-                ologfile.open("Logs_AoDV.txt", std::ios::app);
-                ologfile << "Greedy Next hop found: I am :"<< getSelfIPAddress() <<", source = " << source << ", destination = " << destination << ", nextHop: " << nextHop << endl;
-                ologfile.close();
+                LogValue("Greedy next hop found, source = " + source.str() +  " and next hop = " + nextHop.str() );
 
                 datagram->addTagIfAbsent<NextHopAddressReq>()->setNextHopAddress(nextHop);
                 auto networkInterface = CHK(interfaceTable->findInterfaceByName(outputInterface));
@@ -2044,26 +2066,13 @@ namespace inet
             const auto &networkHeader = getNetworkProtocolHeader(datagram);
             const L3Address &destAddr = networkHeader->getDestinationAddress();
             const L3Address &sourceAddr = networkHeader->getSourceAddress();
-            // Logging
-            std::ofstream ologfile;
-            ologfile.open("Logs_AoDV.txt", std::ios::app);
-            ologfile << "logging method datapreRouting for "<< getSelfIPAddress() << std::endl;
-            ologfile.close();
 
             if (destAddr.isBroadcast() || routingTable->isLocalAddress(destAddr) || destAddr.isMulticast())
-            {
-                // Logging
-                std::ofstream ologfile;
-                ologfile.open("Logs_AoDV.txt", std::ios::app);
-                ologfile  << "not UDP Packet" << std::endl;
-                ologfile.close();
-
                 return ACCEPT;
-            }
-                
             else
             {
-                
+                // Logging
+                LogValue("data gram PRE routing looking route for " + destAddr.str());
 
                 EV_INFO << "Finding route for source " << sourceAddr << " with destination " << destAddr << "current node is " << getSelfIPAddress() << endl;
                 IRoute *route = routingTable->findBestMatchingRoute(destAddr);
@@ -2072,6 +2081,7 @@ namespace inet
                 if (isActive && !route->getNextHopAsGeneric().isUnspecified())
                 {
                     EV_INFO << "Active route found: " << route << endl;
+                    LogValue("Active route found");
 
                     // Each time a route is used to forward a data packet, its Active Route
                     // Lifetime field of the source, destination and the next hop on the
@@ -2081,11 +2091,6 @@ namespace inet
                     updateValidRouteLifeTime(destAddr, simTime() + activeRouteTimeout);
                     updateValidRouteLifeTime(route->getNextHopAsGeneric(), simTime() + activeRouteTimeout);
 
-                    // Logging
-                    std::ofstream ologfile;
-                    ologfile.open("Logs_AoDV.txt", std::ios::app);
-                    ologfile << "I am data pre routing, for " << getSelfIPAddress() << "active route found, this means the route earlier found by AODV, and is still saved" << std::endl;
-                    ologfile.close();
                     return ACCEPT;
                 }
                 else
@@ -2098,27 +2103,18 @@ namespace inet
                     if (mode == GREEDY_ROUTING)
                     {
                         EV_DETAIL << "Mode is greedy " << endl;
-                        // Logging
-                        std::ofstream ologfile;
-                        ologfile.open("Logs_AoDV.txt", std::ios::app);
-                        ologfile << "Looking for route in greedy mode " << std::endl;
-                        ologfile.close();
-
+                        
                         if (routeDatagram(datagram, greedyOption))
                             {
                                 return ACCEPT;
                             }
                         else
                             greedyOption->setRoutingMode(AODV_ROUTING);
+                            destPos = greedyOption->getDestinationPosition();
                     }
 
-                    // Logging
-                    std::ofstream ologfile;
-                    ologfile.open("Logs_AoDV.txt", std::ios::app);
-                    ologfile << "starting AODV route search : greedy route not found, mode set to AODV" << std::endl;
-                    ologfile.close();
                     
-                    
+                    LogValue("mode is AODV");
 
                     bool isInactive = routeData && !routeData->isActive();
                     // A node disseminates a RREQ when it determines that it needs a route
@@ -2142,7 +2138,7 @@ namespace inet
                     }
                     else
                         EV_DETAIL << "Route discovery is in progress, originator " << getSelfIPAddress() << " target " << destAddr << endl;
-                    
+                
                     return QUEUE;
                 }
             }
@@ -2161,6 +2157,8 @@ namespace inet
             const auto &networkHeader = getNetworkProtocolHeader(datagram);
             const L3Address &destAddr = networkHeader->getDestinationAddress();
             const L3Address &sourceAddr = networkHeader->getSourceAddress();
+            // Logging
+            LogValue("datagram LOCAL OUT ");
 
             if (destAddr.isBroadcast() || routingTable->isLocalAddress(destAddr) || destAddr.isMulticast())
                 return ACCEPT;
@@ -2182,31 +2180,24 @@ namespace inet
 
                     updateValidRouteLifeTime(destAddr, simTime() + activeRouteTimeout);
                     updateValidRouteLifeTime(route->getNextHopAsGeneric(), simTime() + activeRouteTimeout);
-                    // Logging
-                    std::ofstream ologfile;
-                    ologfile.open("Logs_AoDV.txt", std::ios::app);
-                    ologfile << "Local out hook :  for host number "<< getSelfIPAddress() << " active route is found, but it should'nt" << sourceAddr << std::endl;
-                    ologfile.close();
+                    
 
                     return ACCEPT;
                 }
                 else
                 {
-                    
-
                     GreedyOption *greedyOption = createGreedyOption(networkHeader->getDestinationAddress());
                     setGreedyOptionOnNetworkDatagram(datagram, networkHeader, greedyOption);
                     // Logging
-                    //std::ofstream ologfile;
-                    //ologfile.open("Logs_AoDV.txt", std::ios::app);
-                    //ologfile << "Logging method datagramLocalOutHook for host number " << sourceAddr << std::endl;
-                    //ologfile << " lets check the mode, ideally greedy one i.e 1 = " <<  greedyOption->getRoutingMode() << std::endl;
                     
 
                     if (routeDatagram(datagram, greedyOption))
                         return ACCEPT;
                     else
-                        greedyOption->setRoutingMode(AODV_ROUTING);
+                        {
+                            greedyOption->setRoutingMode(AODV_ROUTING);
+                            destPos = greedyOption->getDestinationPosition();
+                        }
 
                    // ologfile << " why it switched to AODV ?? find -- mode  =  " <<  greedyOption->getRoutingMode() << std::endl;
                    // ologfile.close();
@@ -2351,6 +2342,14 @@ namespace inet
 
         void Aodv::cancelRouteDiscovery(const L3Address &destAddr)
         {
+            // RL
+            Coord selfPosition = mobility->getCurrentPosition();
+            double distance = (selfPosition - destPos).length();
+            double searchRadius = 500; // only for logging
+            searchRadius = qTable.getActionFromState(distance);
+            qTable.updateTable(distance, false);
+            LogValue("qTable updated negatively for" + std::to_string(searchRadius));
+
             ASSERT(hasOngoingRouteDiscovery(destAddr));
             auto lt = targetAddressToDelayedPackets.lower_bound(destAddr);
             auto ut = targetAddressToDelayedPackets.upper_bound(destAddr);

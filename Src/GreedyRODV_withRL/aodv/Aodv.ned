@@ -33,8 +33,6 @@ simple Aodv like IApp
         @statistic[Control_packets](title="Control packets"; source="ctrlPckCount"; record=vector,stats; interpolationmode=none);
         @class("aodv::Aodv");
         @display("i=block/network2");
-        
-        
         string routingTableModule = default("^.ipv4.routingTable");
         string interfaceTableModule = default("^.interfaceTable");
         string networkProtocolModule = default("^.ipv4.ip");

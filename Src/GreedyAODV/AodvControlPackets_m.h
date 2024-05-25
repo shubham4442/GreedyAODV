@@ -258,9 +258,6 @@ inline void doParsimUnpacking(omnetpp::cCommBuffer *b, GreedyBeacon& obj) {obj.p
  *     L3Address originatorAddr;    // The IP address of the node which originated the Route Request.
  *     uint32_t originatorSeqNum;    // The current sequence number to be used in the route entry pointing towards the originator of the route request.
  * 
- *     double searchRadius; // For limiting the search radius, determined by Q-Table
- *     Coord originatorPos;
- * 
  * }
  * </pre>
  */
@@ -279,8 +276,6 @@ class INET_API Rreq : public ::inet::aodv::AodvControlPacket
     uint32_t destSeqNum = 0;
     ::inet::L3Address originatorAddr;
     uint32_t originatorSeqNum = 0;
-    double searchRadius = 0;
-    ::inet::Coord originatorPos;
 
   private:
     void copy(const Rreq& other);
@@ -334,20 +329,13 @@ class INET_API Rreq : public ::inet::aodv::AodvControlPacket
 
     virtual uint32_t getOriginatorSeqNum() const;
     virtual void setOriginatorSeqNum(uint32_t originatorSeqNum);
-
-    virtual double getSearchRadius() const;
-    virtual void setSearchRadius(double searchRadius);
-
-    virtual const ::inet::Coord& getOriginatorPos() const;
-    virtual ::inet::Coord& getOriginatorPosForUpdate() { handleChange();return const_cast<::inet::Coord&>(const_cast<Rreq*>(this)->getOriginatorPos());}
-    virtual void setOriginatorPos(const ::inet::Coord& originatorPos);
 };
 
 inline void doParsimPacking(omnetpp::cCommBuffer *b, const Rreq& obj) {obj.parsimPack(b);}
 inline void doParsimUnpacking(omnetpp::cCommBuffer *b, Rreq& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:84</tt> by opp_msgtool.
+ * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:81</tt> by opp_msgtool.
  * <pre>
  * //
  * // Represents an AODV Route Reply
@@ -430,7 +418,7 @@ inline void doParsimPacking(omnetpp::cCommBuffer *b, const Rrep& obj) {obj.parsi
 inline void doParsimUnpacking(omnetpp::cCommBuffer *b, Rrep& obj) {obj.parsimUnpack(b);}
 
 /**
- * Struct generated from inet/routing/aodv/AodvControlPackets.msg:102 by opp_msgtool.
+ * Struct generated from inet/routing/aodv/AodvControlPackets.msg:99 by opp_msgtool.
  */
 struct INET_API UnreachableNode
 {
@@ -447,7 +435,7 @@ inline void doParsimPacking(omnetpp::cCommBuffer *b, const UnreachableNode& obj)
 inline void doParsimUnpacking(omnetpp::cCommBuffer *b, UnreachableNode& obj) { __doUnpacking(b, obj); }
 
 /**
- * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:112</tt> by opp_msgtool.
+ * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:109</tt> by opp_msgtool.
  * <pre>
  * //
  * // Represents an AODV Route Error
@@ -506,7 +494,7 @@ inline void doParsimPacking(omnetpp::cCommBuffer *b, const Rerr& obj) {obj.parsi
 inline void doParsimUnpacking(omnetpp::cCommBuffer *b, Rerr& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:124</tt> by opp_msgtool.
+ * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:121</tt> by opp_msgtool.
  * <pre>
  * //
  * // Represents an AODV Route Reply ACK
@@ -547,7 +535,7 @@ inline void doParsimPacking(omnetpp::cCommBuffer *b, const RrepAck& obj) {obj.pa
 inline void doParsimUnpacking(omnetpp::cCommBuffer *b, RrepAck& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:134</tt> by opp_msgtool.
+ * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:131</tt> by opp_msgtool.
  * <pre>
  * //
  * // Represents an internal timer for a Route Reply packet in Aodv module
@@ -597,7 +585,7 @@ inline void doParsimPacking(omnetpp::cCommBuffer *b, const WaitForRrep& obj) {ob
 inline void doParsimUnpacking(omnetpp::cCommBuffer *b, WaitForRrep& obj) {obj.parsimUnpack(b);}
 
 /**
- * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:144</tt> by opp_msgtool.
+ * Class generated from <tt>inet/routing/aodv/AodvControlPackets.msg:141</tt> by opp_msgtool.
  * <pre>
  * //
  * // Represents a timer for delayed sending

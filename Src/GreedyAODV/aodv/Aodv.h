@@ -90,10 +90,6 @@ class INET_API Aodv : public RoutingProtocolBase, public NetfilterBase::HookBase
     UdpSocket socket;
     bool usingIpv6 = false;
 
-    //signal
-    simsignal_t  CtrlPckSignal;
-    int iCtrlPcktCount;
-
     //greedy
     opp_component_ptr<IMobility> mobility;
     PositionTable& globalPositionTable = SIMULATION_SHARED_VARIABLE(globalPositionTable); // KLUDGE implement position registry protocol
@@ -168,6 +164,10 @@ class INET_API Aodv : public RoutingProtocolBase, public NetfilterBase::HookBase
     // internal
     std::multimap<L3Address, Packet *> targetAddressToDelayedPackets; // queue for the datagrams we have no route for
 
+    //Measurement and Logging 
+    simsignal_t  CtrlPckSignal;
+    int iCtrlPcktCount;
+    void LogValue(std::string val );
 
     //greedy methods
     // handling beacon timers
