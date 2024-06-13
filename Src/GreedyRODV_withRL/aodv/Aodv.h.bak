@@ -171,9 +171,6 @@ class INET_API Aodv : public RoutingProtocolBase, public NetfilterBase::HookBase
     std::multimap<L3Address, Packet *> targetAddressToDelayedPackets; // queue for the datagrams we have no route for
 
     //Measurement and Logging 
-    simsignal_t RREQ_traffic;
-    int iNumRREQ;
-        //signal
     simsignal_t  CtrlPckSignal;
     int iCtrlPcktCount;
     void LogValue(std::string val );

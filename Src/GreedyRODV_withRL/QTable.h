@@ -13,16 +13,24 @@ namespace inet
         double maxRadius;
         int ActionSpace, StateSpace;
 
-        QTable();
+
 
     public:
         // Constructor, initialize Qtable with random/predefined values
-        QTable(double imaxRadius, int NbDiscreteAction = 50, int NbDiscreteState = 100);
+        QTable();
+        ~QTable();
+
+        // set parameters
+        void setParams(double imaxRadius, int iActionSpace, int iStateSpace);
 
         // Update Table with new qValue
-        bool updateTable(int iStateIndex, int iActionIndex, bool RouteFound);
+        bool updateTable(double iState,  bool RouteFound);
         
-        // Getter method (action Index)
+        // Getter method (action)
+        double getActionFromState (double iState);
+
+
+        // internal methods
         int getMaxQvalueIndex(double remainingDistance);
 
         // Get radius from index (Action)

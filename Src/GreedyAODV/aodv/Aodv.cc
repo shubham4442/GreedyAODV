@@ -72,6 +72,8 @@ namespace inet
             // signals
     		CtrlPckSignal = registerSignal("ctrlPckCount");
     		iCtrlPcktCount = 0;
+    		DataPckSent = registerSignal("DataPckSent");
+    		DataPckSentCount = 0;
 
             if (stage == INITSTAGE_ROUTING_PROTOCOLS)
             {
@@ -416,8 +418,8 @@ namespace inet
         const GreedyOption *Aodv::getGreedyOptionFromNetworkDatagram(const Ptr<const NetworkHeaderBase> &networkHeader) const
         {
             const GreedyOption *greedyOption = findGreedyOptionInNetworkDatagram(networkHeader);
-            if (greedyOption == nullptr)
-                throw cRuntimeError("Greedy option not found in datagram!");
+          //  if (greedyOption == nullptr)
+          //      throw cRuntimeError("Greedy option not found in datagram!");
             return greedyOption;
         }
 
@@ -574,7 +576,7 @@ namespace inet
         void Aodv::startRouteDiscovery(const L3Address &target, unsigned timeToLive)
         {
             // Logging
-            LogValue("Starting Route discovery ...");
+            LogValue("Starting Route discovery ..");
             EV_INFO << "Starting route discovery with originator " << getSelfIPAddress() << " and destination " << target << endl;
             ASSERT(!hasOngoingRouteDiscovery(target));
             auto rreq = createRREQ(target);
@@ -2061,18 +2063,19 @@ namespace inet
                     // Check if route possible with Greedy routing
                     
                     auto greedyOption = const_cast<GreedyOption *>(getGreedyOptionFromNetworkDatagram(networkHeader));
-                    auto mode = greedyOption->getRoutingMode();
-                    EV_DETAIL << "checking if route possible with greedy routing " << endl;
-                    if (mode == GREEDY_ROUTING)
+                    if(greedyOption != nullptr)
                     {
-                        EV_DETAIL << "Mode is greedy " << endl;
+                        auto mode = greedyOption->getRoutingMode();
+                        EV_DETAIL << "checking if route possible with greedy routing " << endl;
+                        if (mode == GREEDY_ROUTING)
+                        {
+                            EV_DETAIL << "Mode is greedy " << endl;
 
-                        if (routeDatagram(datagram, greedyOption))
-                            {
+                            if (routeDatagram(datagram, greedyOption))
                                 return ACCEPT;
-                            }
-                        else
-                            greedyOption->setRoutingMode(AODV_ROUTING);
+                            else
+                                greedyOption->setRoutingMode(AODV_ROUTING);
+                        }
                     }
 
                     
@@ -2150,6 +2153,11 @@ namespace inet
                 {
                     GreedyOption *greedyOption = createGreedyOption(networkHeader->getDestinationAddress());
                     setGreedyOptionOnNetworkDatagram(datagram, networkHeader, greedyOption);
+
+
+                    DataPckSentCount++;
+                    emit(DataPckSent, DataPckSentCount);
+
                     // Logging
                     
 
@@ -2213,9 +2221,12 @@ namespace inet
             }
 
             auto greedyOption = const_cast<GreedyOption *>(getGreedyOptionFromNetworkDatagram(networkHeader));
-            auto mode = greedyOption->getRoutingMode();
-            if(mode == GREEDY_ROUTING)
-                return ACCEPT;
+            if(greedyOption != nullptr)
+            {
+                auto mode = greedyOption->getRoutingMode();
+                if(mode == GREEDY_ROUTING)
+                    return ACCEPT;
+            }
 
             // TODO IMPLEMENT: check if the datagram is a data packet or we take control packets as data packets
 

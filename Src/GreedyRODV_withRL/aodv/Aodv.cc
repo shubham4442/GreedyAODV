@@ -72,6 +72,8 @@ namespace inet
             // signals
     		CtrlPckSignal = registerSignal("ctrlPckCount");
     		iCtrlPcktCount = 0;
+    		DataPckSent = registerSignal("DataPckSent");
+    		DataPckSentCount = 0;
 
             if (stage == INITSTAGE_ROUTING_PROTOCOLS)
             {
@@ -416,8 +418,8 @@ namespace inet
         const GreedyOption *Aodv::getGreedyOptionFromNetworkDatagram(const Ptr<const NetworkHeaderBase> &networkHeader) const
         {
             const GreedyOption *greedyOption = findGreedyOptionInNetworkDatagram(networkHeader);
-            if (greedyOption == nullptr)
-                throw cRuntimeError("Greedy option not found in datagram!");
+          //  if (greedyOption == nullptr)
+          //      throw cRuntimeError("Greedy option not found in datagram!");
             return greedyOption;
         }
 
@@ -2098,6 +2100,8 @@ namespace inet
                     // Check if route possible with Greedy routing
                     
                     auto greedyOption = const_cast<GreedyOption *>(getGreedyOptionFromNetworkDatagram(networkHeader));
+                    if(greedyOption != nullptr)
+                    {
                     auto mode = greedyOption->getRoutingMode();
                     EV_DETAIL << "checking if route possible with greedy routing " << endl;
                     if (mode == GREEDY_ROUTING)
@@ -2109,10 +2113,12 @@ namespace inet
                                 return ACCEPT;
                             }
                         else
-                            greedyOption->setRoutingMode(AODV_ROUTING);
-                            destPos = greedyOption->getDestinationPosition();
+                            {
+                            	greedyOption->setRoutingMode(AODV_ROUTING);
+                                destPos = greedyOption->getDestinationPosition();
+                        	}
                     }
-
+               		}
                     
                     LogValue("mode is AODV");
 
@@ -2188,6 +2194,11 @@ namespace inet
                 {
                     GreedyOption *greedyOption = createGreedyOption(networkHeader->getDestinationAddress());
                     setGreedyOptionOnNetworkDatagram(datagram, networkHeader, greedyOption);
+
+
+                    DataPckSentCount++;
+                    emit(DataPckSent, DataPckSentCount);
+
                     // Logging
                     
 
@@ -2254,9 +2265,12 @@ namespace inet
             }
 
             auto greedyOption = const_cast<GreedyOption *>(getGreedyOptionFromNetworkDatagram(networkHeader));
+            if(greedyOption != nullptr)
+            {
             auto mode = greedyOption->getRoutingMode();
             if(mode == GREEDY_ROUTING)
                 return ACCEPT;
+            }
 
             // TODO IMPLEMENT: check if the datagram is a data packet or we take control packets as data packets
 

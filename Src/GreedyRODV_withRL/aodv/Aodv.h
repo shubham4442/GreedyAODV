@@ -173,6 +173,8 @@ class INET_API Aodv : public RoutingProtocolBase, public NetfilterBase::HookBase
     //Measurement and Logging 
     simsignal_t  CtrlPckSignal;
     int iCtrlPcktCount;
+    simsignal_t  DataPckSent;
+    int DataPckSentCount;
     void LogValue(std::string val );
 
     //greedy methods

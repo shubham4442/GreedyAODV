@@ -6,10 +6,18 @@
 
 import inet.common.INETDefs;
 import inet.common.packet.chunk.Chunk;
+import inet.common.TlvOptions;
 import inet.common.packet.Packet;
 import inet.networklayer.common.L3Address;
+import inet.common.geometry.Geometry;
 
 namespace inet::aodv;
+
+enum ForwardingMode {
+    GREEDY_ROUTING = 1;
+    AODV_ROUTING = 2;
+};
+
 
 enum AodvControlPacketType
 {
@@ -21,7 +29,14 @@ enum AodvControlPacketType
     RREP_IPv6 = 17;
     RERR_IPv6 = 18;
     RREPACK_IPv6 = 19;
+    GREEDY_BEACON = 21;
 };
+
+
+class GreedyOption extends TlvOptionBase {
+    ForwardingMode routingMode;
+    Coord destinationPosition;               // D
+}
 
 //
 // Base packet for AODV Control Packets
@@ -29,6 +44,12 @@ enum AodvControlPacketType
 class AodvControlPacket extends FieldsChunk
 {
     AodvControlPacketType packetType = static_cast<AodvControlPacketType>(-1);       // packet type, stored in one byte
+}
+
+class GreedyBeacon extends AodvControlPacket
+{
+    L3Address address;
+    Coord position;
 }
 
 //
@@ -50,6 +71,7 @@ class Rreq extends AodvControlPacket
     uint32_t destSeqNum;    // The latest sequence number received in the past by the originator for any route towards the destination.
     L3Address originatorAddr;    // The IP address of the node which originated the Route Request.
     uint32_t originatorSeqNum;    // The current sequence number to be used in the route entry pointing towards the originator of the route request.
+
 }
 
 //

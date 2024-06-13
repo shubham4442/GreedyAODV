@@ -4,6 +4,14 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //
 
+// What are we doing in here
+// I will drop in code of GPSr to do greedy routing for RREQ and rest remains same
+// what to do for Beacon message of GPS exchange?
+//Do I need to purge niegbours?
+// handling mode via message class...AODV or Greedy
+//
+
+
 
 #ifndef __INET_AODV_H
 #define __INET_AODV_H
@@ -12,6 +20,9 @@
 
 #include "inet/common/ModuleRefByPar.h"
 #include "inet/networklayer/contract/IInterfaceTable.h"
+#include "inet/mobility/contract/IMobility.h"
+#include "inet/common/geometry/common/Coord.h"
+#include "inet/routing/gpsr/PositionTable.h"
 #include "inet/networklayer/contract/IL3AddressType.h"
 #include "inet/networklayer/contract/INetfilter.h"
 #include "inet/networklayer/contract/IRoutingTable.h"
@@ -20,6 +31,8 @@
 #include "inet/routing/base/RoutingProtocolBase.h"
 #include "inet/transportlayer/contract/udp/UdpSocket.h"
 #include "inet/transportlayer/udp/UdpHeader_m.h"
+
+#define GREEDY_UDP_PORT    269
 
 namespace inet {
 namespace aodv {
@@ -63,6 +76,12 @@ class INET_API Aodv : public RoutingProtocolBase, public NetfilterBase::HookBase
     // context
     const IL3AddressType *addressType = nullptr; // to support both Ipv4 and v6 addresses.
 
+    //Greedy
+    const char *interfaces = nullptr;
+    simtime_t beaconInterval;
+    simtime_t neighborValidityInterval;
+    bool displayBubbles;
+
     // environment
     cModule *host = nullptr;
     ModuleRefByPar<IRoutingTable> routingTable;
@@ -70,6 +89,24 @@ class INET_API Aodv : public RoutingProtocolBase, public NetfilterBase::HookBase
     ModuleRefByPar<INetfilter> networkProtocol;
     UdpSocket socket;
     bool usingIpv6 = false;
+
+    //greedy
+    opp_component_ptr<IMobility> mobility;
+    PositionTable& globalPositionTable = SIMULATION_SHARED_VARIABLE(globalPositionTable); // KLUDGE implement position registry protocol
+    // internal
+    cMessage *beaconTimer = nullptr;
+    cMessage *purgeNeighborsTimer = nullptr;
+    PositionTable neighborPositionTable;
+    //global q-table
+    // exporting in finish method, importing in constructor or initialization
+    // what could be parameters for state - extent of concavity, remaining distance, nb of neighbours, size of radius 
+
+
+    const char *outputInterface = nullptr;
+    // packet size
+    int positionByteLength = -1;
+
+
 
     // AODV parameters: the following parameters are configurable, see the NED file for more info.
     unsigned int rerrRatelimit = 0;
@@ -127,6 +164,55 @@ class INET_API Aodv : public RoutingProtocolBase, public NetfilterBase::HookBase
     // internal
     std::multimap<L3Address, Packet *> targetAddressToDelayedPackets; // queue for the datagrams we have no route for
 
+    //Measurement and Logging 
+    simsignal_t RREQ_traffic;
+    int iNumRREQ;
+        //signal
+    simsignal_t  CtrlPckSignal;
+    int iCtrlPcktCount;
+    void LogValue(std::string val );
+
+    //greedy methods
+    // handling beacon timers
+    void scheduleBeaconTimer();
+    void processBeaconTimer();
+
+    // handling purge neighbors timers
+    void schedulePurgeNeighborsTimer();
+    void processPurgeNeighborsTimer();
+
+    void sendUdpPacket(Packet *packet);
+
+    // handling beacons
+    const Ptr<GreedyBeacon> createBeacon();
+    void sendBeacon(const Ptr<GreedyBeacon>& beacon);
+    void processBeacon(const Ptr<GreedyBeacon> &beacon);
+
+    // configuration
+    void configureInterfaces();
+
+    // position
+    Coord lookupPositionInGlobalRegistry(const L3Address& address) const;
+    void storePositionInGlobalRegistry(const L3Address& address, const Coord& position) const;
+    void storeSelfPositionInGlobalRegistry() const;
+    Coord computeIntersectionInsideLineSegments(Coord& begin1, Coord& end1, Coord& begin2, Coord& end2) const;
+    Coord getNeighborPosition(const L3Address& address) const;
+
+    // neighbor
+    simtime_t getNextNeighborExpiration();
+    void purgeNeighbors();
+
+    // routing
+    bool routeDatagram(Packet *datagram, GreedyOption *greedyOption);
+    L3Address findGreedyRoutingNextHop(const L3Address& destination, GreedyOption *greedyOption);
+    GreedyOption *createGreedyOption(L3Address destination);
+    int computeOptionLength(GreedyOption *option);
+    const GreedyOption *findGreedyOptionInNetworkDatagram(const Ptr<const NetworkHeaderBase> &networkHeader) const;
+    const GreedyOption *getGreedyOptionFromNetworkDatagram(const Ptr<const NetworkHeaderBase> &networkHeader) const;
+    void setGreedyOptionOnNetworkDatagram(Packet *packet, const Ptr<const NetworkHeaderBase> &networkHeader, GreedyOption *greedyOption);
+
+
+
   protected:
     void handleMessageWhenUp(cMessage *msg) override;
     void initialize(int stage) override;
@@ -182,12 +268,11 @@ class INET_API Aodv : public RoutingProtocolBase, public NetfilterBase::HookBase
     virtual void receiveSignal(cComponent *source, simsignal_t signalID, cObject *obj, cObject *details) override;
 
     /* Netfilter hooks */
-    Result ensureRouteForDatagram(Packet *datagram);
-    virtual Result datagramPreRoutingHook(Packet *datagram) override { Enter_Method("datagramPreRoutingHook"); return ensureRouteForDatagram(datagram); }
+    virtual Result datagramPreRoutingHook(Packet *datagram) override;
     virtual Result datagramForwardHook(Packet *datagram) override;
     virtual Result datagramPostRoutingHook(Packet *datagram) override { return ACCEPT; }
     virtual Result datagramLocalInHook(Packet *datagram) override { return ACCEPT; }
-    virtual Result datagramLocalOutHook(Packet *datagram) override { Enter_Method("datagramLocalOutHook"); return ensureRouteForDatagram(datagram); }
+    virtual Result datagramLocalOutHook(Packet *datagram) override;
     void delayDatagram(Packet *datagram);
 
     /* Helper functions */

@@ -31,6 +31,8 @@ simple Aodv like IApp
     parameters:
         @signal[ctrlPckCount](type="long");
         @statistic[Control_packets](title="Control packets"; source="ctrlPckCount"; record=vector,stats; interpolationmode=none);
+        @signal[DataPckSent](type="long");
+        @statistic[Data_packets_Sent](title="Data packets"; source="DataPckSent"; record=vector,stats; interpolationmode=none);
         @class("aodv::Aodv");
         @display("i=block/network2");
         string routingTableModule = default("^.ipv4.routingTable");
